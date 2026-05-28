@@ -9,6 +9,8 @@ import {
   Building2,
   ChevronDown,
   Search,
+  Map,
+  Tag,
   Bell,
 } from "lucide-react";
 import { useState } from "react";
@@ -29,6 +31,8 @@ const nav = [
   { to: "/assets", label: "Assets", icon: Boxes },
   { to: "/alerts", label: "Alerts", icon: AlertTriangle },
   { to: "/api", label: "API & Integrations", icon: Cable },
+  { to: "/roadmap", label: "Roadmap", icon: Map },
+  { to: "/pricing", label: "Pricing & GTM", icon: Tag },
   { to: "/settings", label: "Tenant Settings", icon: Settings },
 ];
 
