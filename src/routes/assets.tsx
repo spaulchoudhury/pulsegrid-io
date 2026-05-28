@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
 import { assets } from "@/lib/mock-data";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +45,7 @@ function AssetsPage() {
               {assets.map((a) => (
                 <tr key={a.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                   <td className="px-3 py-2.5">
-                    <div className="font-medium">{a.name}</div>
+                    <Link to="/assets/$assetId" params={{ assetId: a.id }} className="font-medium hover:underline">{a.name}</Link>
                     <div className="text-[11px] text-slate-500">{a.id}</div>
                   </td>
                   <td className="px-3 py-2.5 text-slate-600">{a.type}</td>
