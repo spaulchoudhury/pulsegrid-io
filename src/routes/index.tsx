@@ -1,24 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
+import { useApp } from "@/lib/app-context";
+import { fleetUptimeFor, vibrationTrendFor } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { alerts, assets, fleetUptime, healthDistribution, vibrationTrend } from "@/lib/mock-data";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { ArrowUpRight, Cpu, Download, Radio, ShieldCheck, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -37,7 +28,7 @@ function Kpi({ label, value, delta, icon: Icon, tone = "default" }: {
   tone?: "default" | "warn" | "danger" | "good";
 }) {
   const toneClass = {
-    default: "text-slate-900",
+    default: "text-slate-900 dark:text-slate-100",
     good: "text-emerald-600",
     warn: "text-amber-600",
     danger: "text-red-600",
@@ -57,36 +48,44 @@ function Kpi({ label, value, delta, icon: Icon, tone = "default" }: {
 }
 
 function Overview() {
-  const critical = assets.filter((a) => a.health === "critical").length;
+  const { tenant } = useApp();
+  const trend = vibrationTrendFor(tenant.id);
+  const uptime = fleetUptimeFor(tenant.id);
+  const critical = tenant.assets.filter((a) => a.health === "critical").length;
+  const openAlerts = tenant.alerts.filter((a) => !a.ack).length;
+  const featuredAsset = tenant.assets.find((a) => a.health === "critical") ?? tenant.assets[0];
+
   return (
     <AppLayout
-      title="Fleet Overview"
-      subtitle="Real-time vibration & thermal condition across all monitored assets"
+      title={`${tenant.name} — Fleet Overview`}
+      subtitle={`${tenant.industry} · Real-time vibration & thermal condition across all monitored assets`}
       actions={
         <>
-          <Button variant="outline" size="sm"><Download className="size-3.5 mr-1.5" />Export</Button>
-          <Button size="sm">New monitoring rule</Button>
+          <Button variant="outline" size="sm" onClick={() => toast.success("Export started", { description: "CSV will be emailed shortly" })}>
+            <Download className="size-3.5 mr-1.5" />Export
+          </Button>
+          <Button size="sm" onClick={() => toast.success("New monitoring rule wizard opened")}>New monitoring rule</Button>
         </>
       }
     >
       <div className="grid grid-cols-4 gap-4">
-        <Kpi label="Monitored assets" value="211" delta="+6 this week" icon={Cpu} />
-        <Kpi label="Sensors streaming" value="1,248" delta="99.4% online" icon={Radio} tone="good" />
-        <Kpi label="Open alerts" value="12" delta={`${critical} critical`} icon={Zap} tone="warn" />
-        <Kpi label="SLA uptime (30d)" value="99.94%" delta="GDPR · SOC 2 ready" icon={ShieldCheck} tone="good" />
+        <Kpi label="Monitored assets" value={tenant.fleetCount.toLocaleString()} delta={`+${Math.max(2, Math.floor(tenant.fleetCount / 30))} this week`} icon={Cpu} />
+        <Kpi label="Sensors streaming" value={tenant.sensorCount.toLocaleString()} delta="99.4% online" icon={Radio} tone="good" />
+        <Kpi label="Open alerts" value={String(openAlerts)} delta={`${critical} critical`} icon={Zap} tone="warn" />
+        <Kpi label="SLA uptime (30d)" value={tenant.sla} delta="GDPR · SOC 2 ready" icon={ShieldCheck} tone="good" />
       </div>
 
       <div className="grid grid-cols-3 gap-4 mt-4">
         <Card className="col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Vibration RMS — PMP-014 Cooling Pump</CardTitle>
+              <CardTitle className="text-sm">Vibration RMS — {featuredAsset.id} {featuredAsset.name}</CardTitle>
               <span className="text-[11px] text-slate-500">last 48h · mm/s</span>
             </div>
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={vibrationTrend} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
+              <AreaChart data={trend} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
                 <defs>
                   <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
@@ -105,14 +104,12 @@ function Overview() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Fleet health distribution</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Fleet health distribution</CardTitle></CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={healthDistribution} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                  {healthDistribution.map((d) => (
+                <Pie data={tenant.healthDistribution} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                  {tenant.healthDistribution.map((d) => (
                     <Cell key={d.key} fill={COLORS[d.key as keyof typeof COLORS]} />
                   ))}
                 </Pie>
@@ -120,7 +117,7 @@ function Overview() {
               </PieChart>
             </ResponsiveContainer>
             <div className="flex justify-center gap-4 -mt-4 text-[11px]">
-              {healthDistribution.map((d) => (
+              {tenant.healthDistribution.map((d) => (
                 <div key={d.key} className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full" style={{ background: COLORS[d.key as keyof typeof COLORS] }} />
                   {d.name} · {d.value}
@@ -133,24 +130,20 @@ function Overview() {
 
       <div className="grid grid-cols-3 gap-4 mt-4">
         <Card className="col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Top alerts</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Top alerts</CardTitle></CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-slate-100">
-              {alerts.slice(0, 4).map((a) => (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {tenant.alerts.slice(0, 4).map((a) => (
                 <div key={a.id} className="px-4 py-3 flex items-center gap-3">
-                  <span
-                    className={`size-2 rounded-full ${
-                      a.severity === "critical" ? "bg-red-500" : a.severity === "warning" ? "bg-amber-500" : "bg-slate-400"
-                    }`}
-                  />
+                  <span className={`size-2 rounded-full ${
+                    a.severity === "critical" ? "bg-red-500" : a.severity === "warning" ? "bg-amber-500" : "bg-slate-400"
+                  }`} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{a.message}</div>
                     <div className="text-[11px] text-slate-500">{a.assetName} · {a.rule}</div>
                   </div>
                   <span className="text-[11px] text-slate-500">{a.ts}</span>
-                  <Button variant="outline" size="sm" className="h-7 text-xs">Triage</Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toast.success(`Triage opened for ${a.id}`)}>Triage</Button>
                 </div>
               ))}
             </div>
@@ -158,12 +151,10 @@ function Overview() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Fleet uptime (14d)</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Fleet uptime (14d)</CardTitle></CardHeader>
           <CardContent className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={fleetUptime} margin={{ left: -10, right: 0, top: 8, bottom: 0 }}>
+              <BarChart data={uptime} margin={{ left: -10, right: 0, top: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis domain={[97, 100]} tick={{ fontSize: 10, fill: "#64748b" }} />
@@ -176,12 +167,10 @@ function Overview() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Critical & warning assets</CardTitle>
-        </CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Critical & warning assets</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
+            <thead className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100 dark:border-slate-800">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Asset</th>
                 <th className="text-left px-4 py-2 font-medium">Site</th>
@@ -192,13 +181,13 @@ function Overview() {
               </tr>
             </thead>
             <tbody>
-              {assets.filter((a) => a.health !== "healthy").map((a) => (
-                <tr key={a.id} className="border-b border-slate-50 last:border-0">
+              {tenant.assets.filter((a) => a.health !== "healthy").map((a) => (
+                <tr key={a.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
                   <td className="px-4 py-2">
                     <div className="font-medium">{a.name}</div>
                     <div className="text-[11px] text-slate-500">{a.id} · {a.type}</div>
                   </td>
-                  <td className="px-4 py-2 text-slate-600">{a.site}</td>
+                  <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{a.site}</td>
                   <td className="px-4 py-2 tabular-nums">{a.vibrationRms} <span className="text-slate-400 text-xs">mm/s</span></td>
                   <td className="px-4 py-2 tabular-nums">{a.tempC}°C</td>
                   <td className="px-4 py-2"><HealthBadge h={a.health} /></td>
