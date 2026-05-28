@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({ meta: [{ title: "Pricing & GTM · Pulsegrid" }] }),
@@ -70,7 +71,7 @@ function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Button size="sm" variant={t.highlight ? "default" : "outline"} className="w-full">{t.cta}</Button>
+              <Button size="sm" variant={t.highlight ? "default" : "outline"} className="w-full" onClick={() => toast.success(`${t.cta} — request received`, { description: `${t.name} tier · we'll follow up shortly` })}>{t.cta}</Button>
             </CardContent>
           </Card>
         ))}
