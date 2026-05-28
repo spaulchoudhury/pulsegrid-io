@@ -15,6 +15,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssetsIndexRouteImport } from './routes/assets.index'
 import { Route as AssetsAssetIdRouteImport } from './routes/assets.$assetId'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -47,10 +48,15 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssetsIndexRoute = AssetsIndexRouteImport.update({
+  id: '/assets/',
+  path: '/assets/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssetsAssetIdRoute = AssetsAssetIdRouteImport.update({
-  id: '/$assetId',
-  path: '/$assetId',
-  getParentRoute: () => AssetsRoute,
+  id: '/assets/$assetId',
+  path: '/assets/$assetId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/assets/$assetId': typeof AssetsAssetIdRoute
+  '/assets/': typeof AssetsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/assets/$assetId': typeof AssetsAssetIdRoute
+  '/assets': typeof AssetsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/assets/$assetId': typeof AssetsAssetIdRoute
+  '/assets/': typeof AssetsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/settings'
     | '/assets/$assetId'
+    | '/assets/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/settings'
     | '/assets/$assetId'
+    | '/assets'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/settings'
     | '/assets/$assetId'
+    | '/assets/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -118,6 +130,8 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   RoadmapRoute: typeof RoadmapRoute
   SettingsRoute: typeof SettingsRoute
+  AssetsAssetIdRoute: typeof AssetsAssetIdRoute
+  AssetsIndexRoute: typeof AssetsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -164,12 +178,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assets/': {
+      id: '/assets/'
+      path: '/assets'
+      fullPath: '/assets/'
+      preLoaderRoute: typeof AssetsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assets/$assetId': {
       id: '/assets/$assetId'
-      path: '/$assetId'
+      path: '/assets/$assetId'
       fullPath: '/assets/$assetId'
       preLoaderRoute: typeof AssetsAssetIdRouteImport
-      parentRoute: typeof AssetsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -181,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   RoadmapRoute: RoadmapRoute,
   SettingsRoute: SettingsRoute,
+  AssetsAssetIdRoute: AssetsAssetIdRoute,
+  AssetsIndexRoute: AssetsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
