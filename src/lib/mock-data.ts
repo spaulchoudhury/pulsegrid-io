@@ -6,6 +6,7 @@ export interface Asset {
   site: string;
   type: string;
   health: Health;
+  healthScore: number; // 0-100
   vibrationRms: number;
   tempC: number;
   lastSync: string;
@@ -20,6 +21,19 @@ export interface AlertItem {
   message: string;
   ts: string;
   ack: boolean;
+  faultType: string;
+  confidence: number;
+  recommendedAction: string;
+  assignee: string | null;
+  workOrderId?: string;
+}
+
+export interface TenantUser {
+  name: string;
+  email: string;
+  role: string;
+  lastLogin: string;
+  permissions: string[];
 }
 
 export interface TenantData {
@@ -32,6 +46,7 @@ export interface TenantData {
   primaryUser: { name: string; email: string };
   subdomain: string;
   industry: string;
+  primaryColor: string; // hex
   assets: Asset[];
   alerts: AlertItem[];
   sensorCount: number;
@@ -40,7 +55,85 @@ export interface TenantData {
   healthDistribution: { name: string; value: number; key: string }[];
   apiKeys: { label: string; mask: string; scope: string }[];
   integrations: { name: string; status: "Connected" | "Available"; desc: string }[];
-  users: { name: string; email: string; role: string }[];
+  users: TenantUser[];
+  apiMetrics: {
+    callsToday: number;
+    rateLimit: number;
+    rateUsedPct: number;
+    p95LatencyMs: number;
+    errorRatePct: number;
+    webhookDeliveries: number;
+  };
+  alertAnalytics: {
+    mttaHours: number;
+    conversionPct: number;
+    topFault: string;
+    topFaultPct: number;
+    falsePositivePct: number;
+  };
+}
+
+export interface PersonaProfile {
+  name: string;
+  initials: string;
+  role: string;
+  permissions: { allow: string[]; deny: string[] };
+}
+
+export const personas: Record<string, PersonaProfile> = {
+  reliability: {
+    name: "Maria Rossi",
+    initials: "MR",
+    role: "Reliability Manager",
+    permissions: {
+      allow: ["view:assets", "view:alerts", "ack:alerts", "create:workorder", "edit:thresholds", "view:api", "view:reports"],
+      deny: ["manage:users", "manage:apikeys", "delete:tenant"],
+    },
+  },
+  engineer: {
+    name: "Daniel Park",
+    initials: "DP",
+    role: "Maintenance Engineer",
+    permissions: {
+      allow: ["view:assets", "ack:alerts", "create:workorder", "view:reports"],
+      deny: ["edit:thresholds", "manage:users", "manage:apikeys"],
+    },
+  },
+  admin: {
+    name: "Anjali Verma",
+    initials: "AV",
+    role: "IT Admin",
+    permissions: {
+      allow: ["view:assets", "view:alerts", "manage:users", "manage:apikeys", "edit:thresholds", "view:reports", "delete:tenant", "export:data"],
+      deny: [],
+    },
+  },
+  viewer: {
+    name: "Sven Olsen",
+    initials: "SO",
+    role: "Viewer",
+    permissions: {
+      allow: ["view:assets", "view:alerts", "view:reports"],
+      deny: ["ack:alerts", "create:workorder", "edit:thresholds", "manage:users", "manage:apikeys"],
+    },
+  },
+};
+
+function scoreFor(h: Health): number {
+  return h === "healthy" ? 88 + Math.floor(Math.random() * 8) : h === "warning" ? 55 + Math.floor(Math.random() * 12) : 22 + Math.floor(Math.random() * 18);
+}
+// Deterministic scores so server/client match
+function detScore(h: Health, seed: string): number {
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) s += seed.charCodeAt(i);
+  const r = Math.abs(Math.sin(s) * 1000) % 1;
+  if (h === "healthy") return 85 + Math.floor(r * 12);
+  if (h === "warning") return 50 + Math.floor(r * 20);
+  return 18 + Math.floor(r * 22);
+}
+
+function asset(id: string, name: string, site: string, type: string, health: Health, vib: number, temp: number, sync: string): Asset {
+  return { id, name, site, type, health, healthScore: detScore(health, id), vibrationRms: vib, tempC: temp, lastSync: sync };
 }
 
 export const tenants: TenantData[] = [
@@ -54,27 +147,28 @@ export const tenants: TenantData[] = [
     primaryUser: { name: "Maria Rossi", email: "maria@acme.com" },
     subdomain: "acme",
     industry: "Discrete manufacturing",
+    primaryColor: "#4f46e5",
     sensorCount: 1248,
-    fleetCount: 211,
+    fleetCount: 6,
     sla: "99.94%",
     assets: [
-      { id: "PMP-014", name: "Cooling Pump 14", site: "Plant A · Utilities", type: "Centrifugal Pump", health: "critical", vibrationRms: 7.8, tempC: 78, lastSync: "12s ago" },
-      { id: "MTR-208", name: "Conveyor Motor 208", site: "Plant A · Line 3", type: "Induction Motor", health: "warning", vibrationRms: 4.6, tempC: 64, lastSync: "8s ago" },
-      { id: "FAN-031", name: "Exhaust Fan 31", site: "Plant B · HVAC", type: "Axial Fan", health: "healthy", vibrationRms: 1.9, tempC: 41, lastSync: "5s ago" },
-      { id: "CMP-002", name: "Air Compressor 02", site: "Plant A · Utilities", type: "Screw Compressor", health: "healthy", vibrationRms: 2.4, tempC: 55, lastSync: "11s ago" },
-      { id: "GBX-117", name: "Gearbox 117", site: "Plant B · Line 1", type: "Helical Gearbox", health: "warning", vibrationRms: 5.1, tempC: 69, lastSync: "9s ago" },
-      { id: "PMP-009", name: "Feed Pump 09", site: "Plant C · Boiler", type: "Centrifugal Pump", health: "healthy", vibrationRms: 2.1, tempC: 48, lastSync: "6s ago" },
+      asset("PMP-014", "Cooling Pump 14", "Plant A · Utilities", "Centrifugal Pump", "critical", 7.8, 78, "12s ago"),
+      asset("MTR-208", "Conveyor Motor 208", "Plant A · Line 3", "Induction Motor", "warning", 4.6, 64, "8s ago"),
+      asset("FAN-031", "Exhaust Fan 31", "Plant B · HVAC", "Axial Fan", "healthy", 1.9, 41, "5s ago"),
+      asset("CMP-002", "Air Compressor 02", "Plant A · Utilities", "Screw Compressor", "healthy", 2.4, 55, "11s ago"),
+      asset("GBX-117", "Gearbox 117", "Plant B · Line 1", "Helical Gearbox", "warning", 5.1, 69, "9s ago"),
+      asset("PMP-009", "Feed Pump 09", "Plant C · Boiler", "Centrifugal Pump", "healthy", 2.1, 48, "6s ago"),
     ],
     alerts: [
-      { id: "A-2041", assetId: "PMP-014", assetName: "Cooling Pump 14", severity: "critical", rule: "RMS > 7.0 mm/s for 10m", message: "Bearing defect frequency detected (BPFO).", ts: "2m ago", ack: false },
-      { id: "A-2039", assetId: "MTR-208", assetName: "Conveyor Motor 208", severity: "warning", rule: "RMS trending +18% / 24h", message: "Vibration trend rising — schedule inspection.", ts: "27m ago", ack: false },
-      { id: "A-2035", assetId: "GBX-117", assetName: "Gearbox 117", severity: "warning", rule: "Temp > 65°C", message: "Sustained high temperature on output shaft.", ts: "1h ago", ack: true },
-      { id: "A-2028", assetId: "PMP-014", assetName: "Cooling Pump 14", severity: "info", rule: "Calibration", message: "Sensor PMP-014-A1 calibrated.", ts: "6h ago", ack: true },
+      { id: "A-2041", assetId: "PMP-014", assetName: "Cooling Pump 14", severity: "critical", rule: "RMS > 7.0 mm/s for 10m", message: "Bearing defect frequency detected (BPFO).", ts: "2m ago", ack: false, faultType: "BPFO · Outer-race bearing defect", confidence: 0.87, recommendedAction: "Schedule bearing replacement within 14 days. Stage spare 6308-2RS. Notify Maintenance Engineer.", assignee: "Daniel Park" },
+      { id: "A-2039", assetId: "MTR-208", assetName: "Conveyor Motor 208", severity: "warning", rule: "RMS trending +18% / 24h", message: "Vibration trend rising — schedule inspection.", ts: "27m ago", ack: false, faultType: "Trend deviation · misalignment suspected", confidence: 0.74, recommendedAction: "Laser-align motor-conveyor coupling at next planned stop (≤ 30 days).", assignee: "Daniel Park" },
+      { id: "A-2035", assetId: "GBX-117", assetName: "Gearbox 117", severity: "warning", rule: "Temp > 65°C", message: "Sustained high temperature on output shaft.", ts: "1h ago", ack: true, faultType: "Thermal · oil degradation risk", confidence: 0.69, recommendedAction: "Sample gearbox oil and check cooling fan within 7 days.", assignee: "Maria Rossi", workOrderId: "WO-4799" },
+      { id: "A-2028", assetId: "PMP-014", assetName: "Cooling Pump 14", severity: "info", rule: "Calibration", message: "Sensor PMP-014-A1 calibrated.", ts: "6h ago", ack: true, faultType: "Maintenance · calibration", confidence: 1.0, recommendedAction: "No action — informational.", assignee: null },
     ],
     healthDistribution: [
-      { name: "Healthy", value: 184, key: "healthy" },
-      { name: "Warning", value: 23, key: "warning" },
-      { name: "Critical", value: 4, key: "critical" },
+      { name: "Healthy", value: 3, key: "healthy" },
+      { name: "Warning", value: 2, key: "warning" },
+      { name: "Critical", value: 1, key: "critical" },
     ],
     apiKeys: [
       { label: "Production", mask: "pg_live_acme_••••••••••a91f", scope: "read · write" },
@@ -88,11 +182,13 @@ export const tenants: TenantData[] = [
       { name: "PowerBI", status: "Available", desc: "Live dataset for BI dashboards" },
     ],
     users: [
-      { name: "Maria Rossi", email: "maria@acme.com", role: "Reliability Manager" },
-      { name: "Daniel Park", email: "daniel@acme.com", role: "Maintenance Engineer" },
-      { name: "Anjali Verma", email: "anjali@acme.com", role: "IT Admin" },
-      { name: "Sven Olsen", email: "sven@acme.com", role: "Viewer" },
+      { name: "Maria Rossi", email: "maria@acme.com", role: "Reliability Manager", lastLogin: "2h ago", permissions: personas.reliability.permissions.allow },
+      { name: "Daniel Park", email: "daniel@acme.com", role: "Maintenance Engineer", lastLogin: "18m ago", permissions: personas.engineer.permissions.allow },
+      { name: "Anjali Verma", email: "anjali@acme.com", role: "IT Admin", lastLogin: "Yesterday 17:42", permissions: personas.admin.permissions.allow },
+      { name: "Sven Olsen", email: "sven@acme.com", role: "Viewer", lastLogin: "3d ago", permissions: personas.viewer.permissions.allow },
     ],
+    apiMetrics: { callsToday: 412840, rateLimit: 600000, rateUsedPct: 68, p95LatencyMs: 142, errorRatePct: 0.12, webhookDeliveries: 1284 },
+    alertAnalytics: { mttaHours: 4.2, conversionPct: 68, topFault: "Bearing defects", topFaultPct: 42, falsePositivePct: 3.1 },
   },
   {
     id: "nordwind",
@@ -104,25 +200,26 @@ export const tenants: TenantData[] = [
     primaryUser: { name: "Lars Johansen", email: "lars@nordwind.io" },
     subdomain: "nordwind",
     industry: "Wind energy operator",
+    primaryColor: "#0ea5e9",
     sensorCount: 642,
-    fleetCount: 96,
+    fleetCount: 5,
     sla: "99.91%",
     assets: [
-      { id: "WTG-021", name: "Turbine Gearbox 21", site: "Skagen Park · Row 2", type: "Wind Turbine Gearbox", health: "critical", vibrationRms: 8.4, tempC: 81, lastSync: "9s ago" },
-      { id: "WTG-018", name: "Turbine Main Bearing 18", site: "Skagen Park · Row 1", type: "Main Bearing", health: "warning", vibrationRms: 4.9, tempC: 62, lastSync: "11s ago" },
-      { id: "GEN-007", name: "Generator 07", site: "Esbjerg Park · A", type: "PMSG Generator", health: "healthy", vibrationRms: 1.6, tempC: 45, lastSync: "4s ago" },
-      { id: "PIT-044", name: "Pitch Drive 44", site: "Skagen Park · Row 3", type: "Pitch Actuator", health: "healthy", vibrationRms: 2.0, tempC: 38, lastSync: "7s ago" },
-      { id: "YAW-012", name: "Yaw Motor 12", site: "Esbjerg Park · B", type: "Yaw Drive", health: "warning", vibrationRms: 4.2, tempC: 58, lastSync: "10s ago" },
+      asset("WTG-021", "Turbine Gearbox 21", "Skagen Park · Row 2", "Wind Turbine Gearbox", "critical", 8.4, 81, "9s ago"),
+      asset("WTG-018", "Turbine Main Bearing 18", "Skagen Park · Row 1", "Main Bearing", "warning", 4.9, 62, "11s ago"),
+      asset("GEN-007", "Generator 07", "Esbjerg Park · A", "PMSG Generator", "healthy", 1.6, 45, "4s ago"),
+      asset("PIT-044", "Pitch Drive 44", "Skagen Park · Row 3", "Pitch Actuator", "healthy", 2.0, 38, "7s ago"),
+      asset("YAW-012", "Yaw Motor 12", "Esbjerg Park · B", "Yaw Drive", "warning", 4.2, 58, "10s ago"),
     ],
     alerts: [
-      { id: "N-3120", assetId: "WTG-021", assetName: "Turbine Gearbox 21", severity: "critical", rule: "RMS > 7.5 mm/s for 15m", message: "Planetary stage tooth-mesh fault emerging.", ts: "5m ago", ack: false },
-      { id: "N-3118", assetId: "WTG-018", assetName: "Turbine Main Bearing 18", severity: "warning", rule: "Temp > 60°C", message: "Main bearing temperature drifting upward.", ts: "42m ago", ack: false },
-      { id: "N-3110", assetId: "YAW-012", assetName: "Yaw Motor 12", severity: "warning", rule: "Cycle count anomaly", message: "Excess yaw cycles last 6h — wind shear suspected.", ts: "3h ago", ack: true },
+      { id: "N-3120", assetId: "WTG-021", assetName: "Turbine Gearbox 21", severity: "critical", rule: "RMS > 7.5 mm/s for 15m", message: "Planetary stage tooth-mesh fault emerging.", ts: "5m ago", ack: false, faultType: "Gear-mesh frequency anomaly", confidence: 0.91, recommendedAction: "Dispatch climbing team within 72h. De-rate turbine to 60% pending inspection.", assignee: "Mette Sørensen" },
+      { id: "N-3118", assetId: "WTG-018", assetName: "Turbine Main Bearing 18", severity: "warning", rule: "Temp > 60°C", message: "Main bearing temperature drifting upward.", ts: "42m ago", ack: false, faultType: "Thermal drift · lubrication", confidence: 0.66, recommendedAction: "Re-grease bearing at next scheduled service (≤ 21 days).", assignee: "Peter Holm" },
+      { id: "N-3110", assetId: "YAW-012", assetName: "Yaw Motor 12", severity: "warning", rule: "Cycle count anomaly", message: "Excess yaw cycles last 6h — wind shear suspected.", ts: "3h ago", ack: true, faultType: "Operational · wind shear", confidence: 0.55, recommendedAction: "Cross-check met-mast data. No mechanical action required.", assignee: "Lars Johansen", workOrderId: "WO-3308" },
     ],
     healthDistribution: [
-      { name: "Healthy", value: 78, key: "healthy" },
-      { name: "Warning", value: 14, key: "warning" },
-      { name: "Critical", value: 4, key: "critical" },
+      { name: "Healthy", value: 2, key: "healthy" },
+      { name: "Warning", value: 2, key: "warning" },
+      { name: "Critical", value: 1, key: "critical" },
     ],
     apiKeys: [
       { label: "Production", mask: "pg_live_nrdw_••••••••••b22d", scope: "read · write" },
@@ -136,10 +233,12 @@ export const tenants: TenantData[] = [
       { name: "PowerBI", status: "Connected", desc: "Park performance dashboards" },
     ],
     users: [
-      { name: "Lars Johansen", email: "lars@nordwind.io", role: "Reliability Manager" },
-      { name: "Mette Sørensen", email: "mette@nordwind.io", role: "SCADA Engineer" },
-      { name: "Peter Holm", email: "peter@nordwind.io", role: "Field Technician" },
+      { name: "Lars Johansen", email: "lars@nordwind.io", role: "Reliability Manager", lastLogin: "1h ago", permissions: personas.reliability.permissions.allow },
+      { name: "Mette Sørensen", email: "mette@nordwind.io", role: "SCADA Engineer", lastLogin: "Just now", permissions: personas.engineer.permissions.allow },
+      { name: "Peter Holm", email: "peter@nordwind.io", role: "Field Technician", lastLogin: "5h ago", permissions: personas.engineer.permissions.allow },
     ],
+    apiMetrics: { callsToday: 188320, rateLimit: 300000, rateUsedPct: 62, p95LatencyMs: 168, errorRatePct: 0.21, webhookDeliveries: 612 },
+    alertAnalytics: { mttaHours: 3.6, conversionPct: 74, topFault: "Gear-mesh anomalies", topFaultPct: 38, falsePositivePct: 2.4 },
   },
   {
     id: "transrail",
@@ -151,23 +250,24 @@ export const tenants: TenantData[] = [
     primaryUser: { name: "Sophia Klein", email: "sophia@transrail.eu" },
     subdomain: "transrail",
     industry: "Rail freight",
+    primaryColor: "#f59e0b",
     sensorCount: 184,
-    fleetCount: 32,
+    fleetCount: 4,
     sla: "99.80%",
     assets: [
-      { id: "LOC-104", name: "Locomotive 104 Traction Motor", site: "Munich Depot", type: "Traction Motor", health: "warning", vibrationRms: 4.3, tempC: 67, lastSync: "14s ago" },
-      { id: "BGE-022", name: "Bogie 22 Axle Bearing", site: "Hamburg Depot", type: "Axle Bearing", health: "healthy", vibrationRms: 2.2, tempC: 49, lastSync: "8s ago" },
-      { id: "CMP-031", name: "Air Brake Compressor 31", site: "Munich Depot", type: "Reciprocating Compressor", health: "healthy", vibrationRms: 2.6, tempC: 53, lastSync: "10s ago" },
-      { id: "HVC-009", name: "HVAC Blower 09", site: "Berlin Depot", type: "Centrifugal Blower", health: "healthy", vibrationRms: 1.8, tempC: 36, lastSync: "5s ago" },
+      asset("LOC-104", "Locomotive 104 Traction Motor", "Munich Depot", "Traction Motor", "warning", 4.3, 67, "14s ago"),
+      asset("BGE-022", "Bogie 22 Axle Bearing", "Hamburg Depot", "Axle Bearing", "healthy", 2.2, 49, "8s ago"),
+      asset("CMP-031", "Air Brake Compressor 31", "Munich Depot", "Reciprocating Compressor", "healthy", 2.6, 53, "10s ago"),
+      asset("HVC-009", "HVAC Blower 09", "Berlin Depot", "Centrifugal Blower", "healthy", 1.8, 36, "5s ago"),
     ],
     alerts: [
-      { id: "T-1042", assetId: "LOC-104", assetName: "Locomotive 104 Traction Motor", severity: "warning", rule: "RMS trending +22% / 7d", message: "Traction motor vibration rising — inspect at next service.", ts: "14m ago", ack: false },
-      { id: "T-1039", assetId: "LOC-104", assetName: "Locomotive 104 Traction Motor", severity: "info", rule: "Gateway sync", message: "Edge gateway reconnected after WAN flap.", ts: "2h ago", ack: true },
+      { id: "T-1042", assetId: "LOC-104", assetName: "Locomotive 104 Traction Motor", severity: "warning", rule: "RMS trending +22% / 7d", message: "Traction motor vibration rising — inspect at next service.", ts: "14m ago", ack: false, faultType: "Trend deviation · armature wear", confidence: 0.71, recommendedAction: "Inspect commutator and brushes at next depot stop (≤ 14 days).", assignee: "Jonas Weber" },
+      { id: "T-1039", assetId: "LOC-104", assetName: "Locomotive 104 Traction Motor", severity: "info", rule: "Gateway sync", message: "Edge gateway reconnected after WAN flap.", ts: "2h ago", ack: true, faultType: "Connectivity", confidence: 1.0, recommendedAction: "No action — informational.", assignee: null },
     ],
     healthDistribution: [
-      { name: "Healthy", value: 28, key: "healthy" },
-      { name: "Warning", value: 3, key: "warning" },
-      { name: "Critical", value: 1, key: "critical" },
+      { name: "Healthy", value: 3, key: "healthy" },
+      { name: "Warning", value: 1, key: "warning" },
+      { name: "Critical", value: 0, key: "critical" },
     ],
     apiKeys: [
       { label: "Pilot key", mask: "pg_pilot_trnr_••••••••••e44c", scope: "read · write" },
@@ -178,10 +278,20 @@ export const tenants: TenantData[] = [
       { name: "PowerBI", status: "Available", desc: "Fleet BI dashboards" },
     ],
     users: [
-      { name: "Sophia Klein", email: "sophia@transrail.eu", role: "Reliability Lead" },
-      { name: "Jonas Weber", email: "jonas@transrail.eu", role: "Depot Engineer" },
+      { name: "Sophia Klein", email: "sophia@transrail.eu", role: "Reliability Lead", lastLogin: "30m ago", permissions: personas.reliability.permissions.allow },
+      { name: "Jonas Weber", email: "jonas@transrail.eu", role: "Depot Engineer", lastLogin: "4h ago", permissions: personas.engineer.permissions.allow },
     ],
+    apiMetrics: { callsToday: 28140, rateLimit: 100000, rateUsedPct: 28, p95LatencyMs: 312, errorRatePct: 1.8, webhookDeliveries: 84 },
+    alertAnalytics: { mttaHours: 6.1, conversionPct: 52, topFault: "Trend deviations", topFaultPct: 51, falsePositivePct: 4.8 },
   },
+];
+
+export const regions = [
+  { id: "eu-west-1", label: "EU West (Ireland)" },
+  { id: "eu-north-1", label: "EU North (Stockholm)" },
+  { id: "eu-central-1", label: "EU Central (Frankfurt)" },
+  { id: "us-east-1", label: "US East (Virginia)" },
+  { id: "ap-south-1", label: "AP South (Mumbai)" },
 ];
 
 export const getTenant = (id: string) => tenants.find((t) => t.id === id) ?? tenants[0];
@@ -214,3 +324,6 @@ export function fleetUptimeFor(seed: string) {
     return { day: `D${i + 1}`, uptime: +(98 + r * 1.8).toFixed(2) };
   });
 }
+
+// expose unused helper to keep tree-shaker happy
+export { scoreFor };
