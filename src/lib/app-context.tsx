@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getTenant, tenants, type TenantData } from "./mock-data";
+import { getTenant, personas, tenants, type PersonaProfile, type TenantData } from "./mock-data";
 
 export interface Notification {
   id: string;
@@ -11,15 +11,33 @@ export interface Notification {
   read: boolean;
 }
 
+export interface AuditEvent {
+  id: string;
+  ts: string;
+  actor: string;
+  action: string;
+  target: string;
+}
+
 interface AppCtx {
   tenant: TenantData;
   setTenantId: (id: string) => void;
+  region: string;
+  setRegion: (r: string) => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
+  primaryColor: string;
+  setPrimaryColor: (c: string) => void;
   search: string;
   setSearch: (s: string) => void;
   notifications: Notification[];
   markAllRead: () => void;
+  persona: PersonaProfile;
+  setPersonaKey: (k: string) => void;
+  personaKey: string;
+  can: (perm: string) => boolean;
+  audit: AuditEvent[];
+  log: (action: string, target: string) => void;
 }
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -65,6 +83,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [search, setSearch] = useState("");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [personaKey, setPersonaKey] = useState<string>("reliability");
+  const [primaryColor, setPrimaryColorState] = useState<string>("#4f46e5");
+  const [region, setRegion] = useState<string>("eu-west-1");
+  const [audit, setAudit] = useState<AuditEvent[]>([
+    { id: "ev-001", ts: "2m ago", actor: "Daniel Park", action: "Acknowledged alert", target: "A-2041" },
+    { id: "ev-002", ts: "18m ago", actor: "Maria Rossi", action: "Created work order", target: "WO-4799 ← A-2035" },
+    { id: "ev-003", ts: "1h ago", actor: "Anjali Verma", action: "Rotated API key", target: "Production" },
+  ]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -73,7 +99,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     else root.classList.remove("dark");
   }, [theme]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.style.setProperty("--brand", primaryColor);
+  }, [primaryColor]);
+
   const tenant = useMemo(() => getTenant(tenantId), [tenantId]);
+
+  // Sync brand color & region when tenant changes
+  useEffect(() => {
+    setPrimaryColorState(tenant.primaryColor);
+    setRegion(tenant.region);
+  }, [tenant]);
 
   const baseNotifs = useMemo(() => buildNotifications(tenant), [tenant]);
   const notifications = useMemo(
@@ -95,9 +132,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setReadIds(new Set(baseNotifs.map((n) => n.id)));
   }, [baseNotifs]);
 
+  const persona = personas[personaKey] ?? personas.reliability;
+  const can = useCallback(
+    (perm: string) => persona.permissions.allow.includes(perm) && !persona.permissions.deny.includes(perm),
+    [persona]
+  );
+
+  const log = useCallback((action: string, target: string) => {
+    setAudit((a) => [
+      { id: `ev-${Date.now()}`, ts: "just now", actor: persona.name, action, target },
+      ...a,
+    ].slice(0, 25));
+  }, [persona.name]);
+
+  const setPrimaryColor = useCallback((c: string) => setPrimaryColorState(c), []);
+
   return (
     <Ctx.Provider
-      value={{ tenant, setTenantId, theme, toggleTheme, search, setSearch, notifications, markAllRead }}
+      value={{
+        tenant, setTenantId,
+        region, setRegion,
+        theme, toggleTheme,
+        primaryColor, setPrimaryColor,
+        search, setSearch,
+        notifications, markAllRead,
+        persona, setPersonaKey, personaKey,
+        can,
+        audit, log,
+      }}
     >
       {children}
     </Ctx.Provider>
@@ -110,4 +172,4 @@ export function useApp() {
   return v;
 }
 
-export { tenants };
+export { tenants, personas };
