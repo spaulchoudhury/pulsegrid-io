@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/assets/")({
@@ -140,15 +140,16 @@ function AssetsPage() {
             </thead>
             <tbody>
               {grouped ? grouped.map(([k, items]) => (
-                <tbody key={`g-${k}`}>
+                <Fragment key={`g-${k}`}>
                   <tr className="bg-slate-50 dark:bg-slate-800/60">
                     <td colSpan={7} className="px-3 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
                       {k} <span className="text-slate-400">· {items.length}</span>
                     </td>
                   </tr>
                   {items.map((a) => <Row key={a.id} a={a} />)}
-                </tbody>
+                </Fragment>
               )) : rows.map((a) => <Row key={a.id} a={a} />)}
+              {rows.length === 0 && (
                 <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-500">No assets match the current filters</td></tr>
               )}
             </tbody>
