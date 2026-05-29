@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, BellOff, Check, ChevronDown, ChevronUp, History, ShieldCheck, Webhook, Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { AlertTriangle, BellOff, Check, ChevronDown, ChevronUp, History, ShieldCheck, Webhook, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/alerts")({
   head: () => ({ meta: [{ title: "Alerts · Pulsegrid" }] }),

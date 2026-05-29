@@ -140,16 +140,15 @@ function AssetsPage() {
             </thead>
             <tbody>
               {grouped ? grouped.map(([k, items]) => (
-                <>
-                  <tr key={`g-${k}`} className="bg-slate-50 dark:bg-slate-800/60">
+                <tbody key={`g-${k}`}>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60">
                     <td colSpan={7} className="px-3 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
                       {k} <span className="text-slate-400">· {items.length}</span>
                     </td>
                   </tr>
                   {items.map((a) => <Row key={a.id} a={a} />)}
-                </>
+                </tbody>
               )) : rows.map((a) => <Row key={a.id} a={a} />)}
-              {rows.length === 0 && (
                 <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-500">No assets match the current filters</td></tr>
               )}
             </tbody>
