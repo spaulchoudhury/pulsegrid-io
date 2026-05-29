@@ -1,14 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
 import { useApp } from "@/lib/app-context";
 import { fleetUptimeFor, vibrationTrendFor } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { ArrowUpRight, Cpu, Download, Radio, ShieldCheck, Zap } from "lucide-react";
+import { ArrowUpRight, Cpu, Download, Radio, ShieldCheck, UserCog, Zap } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -47,13 +55,109 @@ function Kpi({ label, value, delta, icon: Icon, tone = "default" }: {
   );
 }
 
+function NewRuleDialog() {
+  const { tenant, can, log } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("Bearing RMS critical");
+  const [assetId, setAssetId] = useState<string>(tenant.assets[0]?.id ?? "");
+  const [metric, setMetric] = useState("rms");
+  const [op, setOp] = useState(">");
+  const [value, setValue] = useState("5.0");
+  const [severity, setSeverity] = useState("critical");
+  const allowed = can("edit:thresholds");
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" disabled={!allowed} title={allowed ? "" : "Your role cannot edit thresholds"}>
+          New monitoring rule
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New monitoring rule — {tenant.name}</DialogTitle>
+          <DialogDescription>Threshold or trend rule. Triggers create alerts, webhooks, and (optionally) CMMS work orders.</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 grid gap-1.5">
+            <Label className="text-xs">Rule name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Scope: Asset</Label>
+            <Select value={assetId} onValueChange={setAssetId}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="*">All assets in tenant</SelectItem>
+                {tenant.assets.map((a) => <SelectItem key={a.id} value={a.id}>{a.id} · {a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Metric</Label>
+            <Select value={metric} onValueChange={setMetric}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rms">Vibration RMS (mm/s)</SelectItem>
+                <SelectItem value="temp">Temperature (°C)</SelectItem>
+                <SelectItem value="trend">RMS trend (% / 24h)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Operator</Label>
+            <Select value={op} onValueChange={setOp}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value=">">{">"}</SelectItem>
+                <SelectItem value=">=">{">="}</SelectItem>
+                <SelectItem value="<">{"<"}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Threshold</Label>
+            <Input value={value} onChange={(e) => setValue(e.target.value)} className="h-8" />
+          </div>
+          <div className="col-span-2 grid gap-1.5">
+            <Label className="text-xs">Severity</Label>
+            <Select value={severity} onValueChange={setSeverity}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setOpen(false);
+              log("Created monitoring rule", `${name} · ${metric} ${op} ${value}`);
+              toast.success("Monitoring rule created", { description: `${name} · ${assetId === "*" ? "all assets" : assetId} · ${severity}` });
+            }}
+          >Create rule</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Overview() {
-  const { tenant } = useApp();
-  const trend = vibrationTrendFor(tenant.id);
+  const { tenant, persona, can } = useApp();
+  const navigate = useNavigate();
+  const [chartAssetId, setChartAssetId] = useState<string>(tenant.assets[0]?.id ?? "");
+  const chartAsset = useMemo(
+    () => tenant.assets.find((a) => a.id === chartAssetId) ?? tenant.assets[0],
+    [chartAssetId, tenant]
+  );
+  const trend = vibrationTrendFor(`${tenant.id}-${chartAsset.id}`);
   const uptime = fleetUptimeFor(tenant.id);
   const critical = tenant.assets.filter((a) => a.health === "critical").length;
   const openAlerts = tenant.alerts.filter((a) => !a.ack).length;
-  const featuredAsset = tenant.assets.find((a) => a.health === "critical") ?? tenant.assets[0];
 
   return (
     <AppLayout
@@ -61,26 +165,41 @@ function Overview() {
       subtitle={`${tenant.industry} · Real-time vibration & thermal condition across all monitored assets`}
       actions={
         <>
-          <Button variant="outline" size="sm" onClick={() => toast.success("Export started", { description: "CSV will be emailed shortly" })}>
+          <Badge variant="outline" className="hidden md:inline-flex text-[10px] gap-1">
+            <UserCog className="size-3" /> Viewing as {persona.role}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={() => toast.success("Export started", { description: "CSV will be emailed shortly" })} disabled={!can("view:reports")}>
             <Download className="size-3.5 mr-1.5" />Export
           </Button>
-          <Button size="sm" onClick={() => toast.success("New monitoring rule wizard opened")}>New monitoring rule</Button>
+          <NewRuleDialog />
         </>
       }
     >
-      <div className="grid grid-cols-4 gap-4">
-        <Kpi label="Monitored assets" value={tenant.fleetCount.toLocaleString()} delta={`+${Math.max(2, Math.floor(tenant.fleetCount / 30))} this week`} icon={Cpu} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Kpi label="Monitored assets" value={tenant.assets.length.toLocaleString()} delta={`${critical} critical · ${tenant.assets.filter(a=>a.health==="warning").length} warning`} icon={Cpu} />
         <Kpi label="Sensors streaming" value={tenant.sensorCount.toLocaleString()} delta="99.4% online" icon={Radio} tone="good" />
         <Kpi label="Open alerts" value={String(openAlerts)} delta={`${critical} critical`} icon={Zap} tone="warn" />
         <Kpi label="SLA uptime (30d)" value={tenant.sla} delta="GDPR · SOC 2 ready" icon={ShieldCheck} tone="good" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <Card className="col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <Card className="md:col-span-2">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Vibration RMS — {featuredAsset.id} {featuredAsset.name}</CardTitle>
-              <span className="text-[11px] text-slate-500">last 48h · mm/s</span>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="text-sm">Vibration RMS — {chartAsset.id} {chartAsset.name}</CardTitle>
+              <div className="flex items-center gap-2">
+                <Select value={chartAssetId} onValueChange={setChartAssetId}>
+                  <SelectTrigger className="h-7 text-xs w-56"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {tenant.assets.map((a) => (
+                      <SelectItem key={a.id} value={a.id} className="text-xs">
+                        {a.id} · {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[11px] text-slate-500">48h · mm/s</span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="h-64">
@@ -128,8 +247,8 @@ function Overview() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <Card className="col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <Card className="md:col-span-2">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Top alerts</CardTitle></CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -143,7 +262,14 @@ function Overview() {
                     <div className="text-[11px] text-slate-500">{a.assetName} · {a.rule}</div>
                   </div>
                   <span className="text-[11px] text-slate-500">{a.ts}</span>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toast.success(`Triage opened for ${a.id}`)}>Triage</Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => navigate({ to: "/alerts", hash: a.id })}
+                  >
+                    Triage
+                  </Button>
                 </div>
               ))}
             </div>
@@ -190,7 +316,7 @@ function Overview() {
                   <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{a.site}</td>
                   <td className="px-4 py-2 tabular-nums">{a.vibrationRms} <span className="text-slate-400 text-xs">mm/s</span></td>
                   <td className="px-4 py-2 tabular-nums">{a.tempC}°C</td>
-                  <td className="px-4 py-2"><HealthBadge h={a.health} /></td>
+                  <td className="px-4 py-2"><HealthBadge h={a.health} score={a.healthScore} /></td>
                   <td className="px-4 py-2 text-slate-500 text-xs">{a.lastSync}</td>
                 </tr>
               ))}
