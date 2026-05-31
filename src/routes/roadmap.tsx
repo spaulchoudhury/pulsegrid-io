@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Activity, Zap, BrainCircuit, Smartphone, Globe2, Check } from "lucide-react";
 
 export const Route = createFileRoute("/roadmap")({
-  head: () => ({ meta: [{ title: "Roadmap · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Roadmap · PulseGrid" }] }),
   component: RoadmapPage,
 });
 

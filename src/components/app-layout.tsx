@@ -20,8 +20,9 @@ import {
   FileText,
   ShieldCheck,
   Lock,
+  LogOut,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tenants, personas } from "@/lib/mock-data";
 import { useApp } from "@/lib/app-context";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import logoLight from "@/assets/pulsegrid-logo-light.png";
+import logoDark from "@/assets/pulsegrid-logo-dark.png";
 
 const nav = [
   { to: "/", label: "Overview", icon: Gauge },
@@ -49,16 +52,25 @@ const nav = [
   { to: "/settings", label: "Tenant Settings", icon: Settings },
 ] as const;
 
+const PERSONA_KEYS = ["reliability", "engineer", "admin", "viewer"] as const;
+
 export function AppLayout({ children, title, subtitle, actions }: {
   children: React.ReactNode;
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
 }) {
-  const { tenant, setTenantId, theme, toggleTheme, search, setSearch, notifications, markAllRead, persona, setPersonaKey, personaKey, primaryColor, region } = useApp();
+  const { tenant, setTenantId, theme, toggleTheme, search, setSearch, notifications, markAllRead, markRead, persona, setPersonaKey, personaKey, primaryColor, region, signedIn, signOut } = useApp();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Soft auth gate — first visit lands on /login
+  useEffect(() => {
+    if (!signedIn && pathname !== "/login") {
+      navigate({ to: "/login" });
+    }
+  }, [signedIn, pathname, navigate]);
 
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -76,17 +88,8 @@ export function AppLayout({ children, title, subtitle, actions }: {
     <div className="min-h-screen flex bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
-        <div className="h-14 px-4 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
-          <div
-            className="size-7 rounded-md grid place-items-center text-white"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Activity className="size-4" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">Pulsegrid</div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Condition Monitoring</div>
-          </div>
+        <div className="h-14 px-3 flex items-center border-b border-slate-200 dark:border-slate-800">
+          <img src={theme === "dark" ? logoDark : logoLight} alt="PulseGrid" className="h-8 w-auto" />
         </div>
 
         <DropdownMenu>
@@ -215,7 +218,7 @@ export function AppLayout({ children, title, subtitle, actions }: {
                         onClick={() => {
                           setSearchOpen(false);
                           setSearch("");
-                          navigate({ to: "/alerts" });
+                          navigate({ to: "/alerts", hash: a.id });
                         }}
                         className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2"
                       >
@@ -254,7 +257,7 @@ export function AppLayout({ children, title, subtitle, actions }: {
               </PopoverTrigger>
               <PopoverContent align="end" className="w-96 p-0">
                 <div className="flex items-center justify-between px-3 py-2 border-b">
-                  <div className="text-sm font-semibold">Notifications</div>
+                  <div className="text-sm font-semibold">Notifications · {tenant.name}</div>
                   <button
                     onClick={() => {
                       markAllRead();
@@ -278,7 +281,20 @@ export function AppLayout({ children, title, subtitle, actions }: {
                             ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-900"
                             : "text-slate-600 bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
                       return (
-                        <div key={n.id} className={`px-3 py-2.5 flex items-start gap-2.5 border-b last:border-0 ${!n.read ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}>
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            markRead(n.id);
+                            if (n.assetId) {
+                              navigate({ to: "/assets/$assetId", params: { assetId: n.assetId } });
+                            } else if (n.alertId) {
+                              navigate({ to: "/alerts", hash: n.alertId });
+                            } else if (n.href === "/api") {
+                              navigate({ to: "/api" });
+                            }
+                          }}
+                          className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800 ${!n.read ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}
+                        >
                           <div className={`size-7 rounded-md border grid place-items-center ${sev}`}>
                             <Icon className="size-3.5" />
                           </div>
@@ -287,7 +303,7 @@ export function AppLayout({ children, title, subtitle, actions }: {
                             <div className="text-[11px] text-slate-500 truncate">{n.detail}</div>
                           </div>
                           <div className="text-[10px] text-slate-400 whitespace-nowrap">{n.ts}</div>
-                        </div>
+                        </button>
                       );
                     })
                   )}
@@ -306,7 +322,7 @@ export function AppLayout({ children, title, subtitle, actions }: {
                   className="size-8 rounded-full text-white grid place-items-center text-xs font-medium ring-2 ring-white dark:ring-slate-900"
                   style={{ background: `linear-gradient(135deg, ${primaryColor}, #a855f7)` }}
                   aria-label="Account"
-                  title={`Logged in as ${persona.name} (${persona.role})`}
+                  title={`Logged in as ${persona.name} (${persona.role}) · ${tenant.name}`}
                 >
                   {persona.initials}
                 </button>
@@ -321,7 +337,7 @@ export function AppLayout({ children, title, subtitle, actions }: {
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate">{persona.name}</div>
-                    <div className="text-[11px] text-slate-500">{persona.role}</div>
+                    <div className="text-[11px] text-slate-500">{persona.role} · {tenant.name}</div>
                   </div>
                 </div>
                 <div className="py-2 space-y-1">
@@ -341,23 +357,42 @@ export function AppLayout({ children, title, subtitle, actions }: {
                 <div className="pt-2 border-t">
                   <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Switch persona (demo)</div>
                   <div className="grid grid-cols-2 gap-1">
-                    {Object.entries(personas).map(([k, p]) => (
-                      <button
-                        key={k}
-                        onClick={() => {
-                          setPersonaKey(k);
-                          toast.success(`Now viewing as ${p.role}`);
-                        }}
-                        className={`text-[11px] px-2 py-1 rounded border ${
-                          personaKey === k
-                            ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900"
-                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        }`}
-                      >
-                        {p.role}
-                      </button>
-                    ))}
+                    {PERSONA_KEYS.map((k, idx) => {
+                      const p = personas[k];
+                      const u = tenant.users[idx] ?? tenant.users[0];
+                      return (
+                        <button
+                          key={k}
+                          onClick={() => {
+                            setPersonaKey(k);
+                            toast.success(`Now viewing as ${u.role}`, { description: `${u.name} · ${tenant.name}` });
+                          }}
+                          className={`text-[11px] px-2 py-1 rounded border text-left ${
+                            personaKey === k
+                              ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900"
+                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`}
+                          title={`${u.name} · ${u.role}`}
+                        >
+                          <div className="truncate font-medium">{p.role}</div>
+                          <div className="text-[9px] opacity-70 truncate">{u.name}</div>
+                        </button>
+                      );
+                    })}
                   </div>
+                </div>
+                <div className="pt-2 border-t mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs h-8"
+                    onClick={() => {
+                      signOut();
+                      navigate({ to: "/login" });
+                    }}
+                  >
+                    <LogOut className="size-3.5 mr-1.5" /> Sign out
+                  </Button>
                 </div>
               </PopoverContent>
             </Popover>
@@ -382,7 +417,7 @@ export function HealthBadge({ h, score }: { h: "healthy" | "warning" | "critical
   const map = {
     healthy: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
     warning: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
-    critical: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900",
+    critical: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:border-red-900 dark:text-red-300",
   } as const;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium capitalize ${map[h]}`}>
