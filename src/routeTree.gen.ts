@@ -13,6 +13,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRoute = ApiRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/api': typeof ApiRoute
+  '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reports': typeof ReportsRoute
   '/roadmap': typeof RoadmapRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/api': typeof ApiRoute
+  '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reports': typeof ReportsRoute
   '/roadmap': typeof RoadmapRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/api': typeof ApiRoute
+  '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reports': typeof ReportsRoute
   '/roadmap': typeof RoadmapRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/api'
+    | '/login'
     | '/pricing'
     | '/reports'
     | '/roadmap'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/api'
+    | '/login'
     | '/pricing'
     | '/reports'
     | '/roadmap'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/api'
+    | '/login'
     | '/pricing'
     | '/reports'
     | '/roadmap'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   ApiRoute: typeof ApiRoute
+  LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
   ReportsRoute: typeof ReportsRoute
   RoadmapRoute: typeof RoadmapRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   ApiRoute: ApiRoute,
+  LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
   ReportsRoute: ReportsRoute,
   RoadmapRoute: RoadmapRoute,
