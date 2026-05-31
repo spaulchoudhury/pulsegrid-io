@@ -11,11 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Check, Download, Sparkles, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/settings")({
-  head: () => ({ meta: [{ title: "Tenant settings · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Tenant settings · PulseGrid" }] }),
   component: SettingsPage,
 });
 
@@ -27,6 +27,13 @@ function SettingsPage() {
   const [nameDraft, setNameDraft] = useState(tenant.name);
   const [subDraft, setSubDraft] = useState(tenant.subdomain);
   const [wizardStep, setWizardStep] = useState(1);
+
+  // Reset branding drafts when tenant switches
+  useEffect(() => {
+    setNameDraft(tenant.name);
+    setSubDraft(tenant.subdomain);
+    setColorDraft(tenant.primaryColor);
+  }, [tenant]);
   const [wizardDismissed, setWizardDismissed] = useState(false);
 
   return (
@@ -39,7 +46,7 @@ function SettingsPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-indigo-600" />
-              <CardTitle className="text-sm text-indigo-900 dark:text-indigo-200">Welcome to Pulsegrid — set up your workspace</CardTitle>
+              <CardTitle className="text-sm text-indigo-900 dark:text-indigo-200">Welcome to PulseGrid — set up your workspace</CardTitle>
               <button onClick={() => setWizardDismissed(true)} className="ml-auto text-[11px] text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">Dismiss</button>
             </div>
           </CardHeader>
