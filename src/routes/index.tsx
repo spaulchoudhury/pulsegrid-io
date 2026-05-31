@@ -22,7 +22,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Pulsegrid · Condition Monitoring Overview" },
+      { title: "PulseGrid · Condition Monitoring Overview" },
       { name: "description", content: "Multi-tenant condition monitoring SaaS prototype dashboard." },
     ],
   }),

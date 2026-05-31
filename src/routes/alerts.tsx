@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/alerts")({
-  head: () => ({ meta: [{ title: "Alerts · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Alerts · PulseGrid" }] }),
   component: AlertsPage,
 });
 

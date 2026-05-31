@@ -10,7 +10,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/reports")({
-  head: () => ({ meta: [{ title: "Reports · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Reports · PulseGrid" }] }),
   component: ReportsPage,
 });
 

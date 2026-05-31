@@ -9,7 +9,7 @@ import { Activity, BookOpen, Copy, KeyRound, Plug, Webhook } from "lucide-react"
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/api")({
-  head: () => ({ meta: [{ title: "API & Integrations · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "API & Integrations · PulseGrid" }] }),
   component: ApiPage,
 });
 

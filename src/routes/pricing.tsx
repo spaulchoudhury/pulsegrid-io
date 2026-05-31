@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/pricing")({
-  head: () => ({ meta: [{ title: "Billing & Usage · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Billing & Usage · PulseGrid" }] }),
   component: PricingPage,
 });
 

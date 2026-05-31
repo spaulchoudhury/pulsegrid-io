@@ -102,7 +102,7 @@ function SettingsPage() {
             )}
             {wizardStep === 3 && (
               <div className="text-sm text-slate-600 dark:text-slate-300">
-                Step 3 — Add assets. Import a CSV of asset IDs, sites, types — or wire up your CMMS. Pulsegrid then auto-discovers sensors on first ingest.
+                Step 3 — Add assets. Import a CSV of asset IDs, sites, types — or wire up your CMMS. PulseGrid then auto-discovers sensors on first ingest.
               </div>
             )}
             {wizardStep === 4 && (

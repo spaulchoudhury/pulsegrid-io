@@ -11,7 +11,7 @@ import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/assets/")({
-  head: () => ({ meta: [{ title: "Assets · Pulsegrid" }] }),
+  head: () => ({ meta: [{ title: "Assets · PulseGrid" }] }),
   component: AssetsPage,
 });
 

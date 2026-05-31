@@ -10,7 +10,7 @@ import { ArrowLeft, BrainCircuit, Wrench, Radio } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/assets/$assetId")({
-  head: ({ params }) => ({ meta: [{ title: `${params.assetId} · Pulsegrid` }] }),
+  head: ({ params }) => ({ meta: [{ title: `${params.assetId} · PulseGrid` }] }),
   notFoundComponent: () => (
     <AppLayout title="Asset not found"><p className="text-sm text-slate-500">No asset matches that ID for this tenant.</p></AppLayout>
   ),
