@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
-  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Label as RLabel,
 } from "recharts";
+import { AlertTriangle as AlertIcon, TrendingUp } from "lucide-react";
 import { ArrowUpRight, Cpu, Download, Radio, ShieldCheck, UserCog, Zap } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -202,23 +203,54 @@ function Overview() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="t" tick={{ fontSize: 10, fill: "#64748b" }} interval={5} />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={[0, 10]} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <ReferenceLine y={5} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "Alarm 5.0", fontSize: 10, fill: "#ef4444", position: "right" }} />
-                <Area type="monotone" dataKey="rms" stroke="#6366f1" strokeWidth={2} fill="url(#g)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <CardContent className="h-72">
+            {(() => {
+              const peak = trend.reduce((m, d, i) => (d.rms > trend[m].rms ? i : m), 0);
+              const trendShift = Math.max(0, peak - 8);
+              const alertIdx = Math.max(0, peak - 3);
+              const peakPoint = trend[peak];
+              const isCritical = chartAsset.health === "critical";
+              return (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ left: -5, right: 40, top: 24, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="t" tick={{ fontSize: 10, fill: "#64748b" }} interval={5} label={{ value: "Time (hh:mm, last 48h)", position: "insideBottom", offset: -2, fontSize: 10, fill: "#94a3b8" }} />
+                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={[0, 10]} label={{ value: "RMS (mm/s)", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8", offset: 15 }} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                    {/* Healthy band */}
+                    <ReferenceArea y1={0} y2={3.5} fill="#10b981" fillOpacity={0.05} />
+                    <ReferenceLine y={3.5} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: "Warning 3.5", fontSize: 9, fill: "#f59e0b", position: "right" }} />
+                    <ReferenceLine y={5} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "Critical 5.0 mm/s", fontSize: 10, fill: "#ef4444", position: "right" }} />
+                    <Area type="monotone" dataKey="rms" stroke="#6366f1" strokeWidth={2} fill="url(#g)" />
+                    {isCritical && (
+                      <>
+                        <ReferenceLine x={trend[trendShift]?.t} stroke="#0ea5e9" strokeDasharray="2 2" label={{ value: "↑ Trend shift", fontSize: 9, fill: "#0ea5e9", position: "top" }} />
+                        <ReferenceLine x={trend[alertIdx]?.t} stroke="#f59e0b" label={{ value: "⚠ Alert triggered", fontSize: 9, fill: "#f59e0b", position: "top" }} />
+                        <ReferenceDot x={peakPoint.t} y={peakPoint.rms} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2}>
+                          <RLabel value={`BPFO · ${peakPoint.rms} mm/s`} fontSize={10} fill="#ef4444" position="top" offset={10} />
+                        </ReferenceDot>
+                      </>
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              );
+            })()}
+            {chartAsset.health === "critical" && (
+              <div className="mt-1 text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                <AlertIcon className="size-3" /> ML caught the trend ~6h before it crossed critical — RUL 9–14 days.
+              </div>
+            )}
+            {chartAsset.health === "warning" && (
+              <div className="mt-1 text-[11px] text-amber-600 flex items-center gap-1.5">
+                <TrendingUp className="size-3" /> Trend rising — inspect within next planned stop.
+              </div>
+            )}
           </CardContent>
         </Card>
 
