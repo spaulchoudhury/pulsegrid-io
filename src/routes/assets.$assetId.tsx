@@ -5,7 +5,7 @@ import { vibrationTrendFor } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart, Label as RLabel, Legend } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart, Label as RLabel, Legend } from "recharts";
 import { ArrowLeft, BrainCircuit, Wrench, Radio } from "lucide-react";
 import { toast } from "sonner";
 
