@@ -5,7 +5,7 @@ import { vibrationTrendFor } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart } from "recharts";
+import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart, Label as RLabel, Legend } from "recharts";
 import { ArrowLeft, BrainCircuit, Wrench, Radio } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,12 +35,26 @@ function AssetDetail() {
   }
 
   const trend = vibrationTrendFor(`${tenant.id}-${asset.id}`);
+  // Fleet average per timestamp across other assets
+  const otherTrends = tenant.assets.filter((a) => a.id !== asset.id).map((a) => vibrationTrendFor(`${tenant.id}-${a.id}`));
+  const merged = trend.map((d, i) => {
+    const fleetAvg = otherTrends.length
+      ? +(otherTrends.reduce((s, t) => s + (t[i]?.rms ?? 0), 0) / otherTrends.length).toFixed(2)
+      : 0;
+    return { t: d.t, rms: d.rms, fleet: fleetAvg };
+  });
+  const peak = merged.reduce((m, d, i) => (d.rms > merged[m].rms ? i : m), 0);
+  const fleetAvgOverall = +(merged.reduce((s, d) => s + d.fleet, 0) / merged.length).toFixed(2);
+  const assetAvg = +(merged.reduce((s, d) => s + d.rms, 0) / merged.length).toFixed(2);
+  const deltaPct = fleetAvgOverall > 0 ? Math.round(((assetAvg - fleetAvgOverall) / fleetAvgOverall) * 100) : 0;
+
+  // FFT peaks — annotate dominant frequency
   const spectrum = Array.from({ length: 32 }, (_, i) => ({
-    hz: `${(i + 1) * 25}`,
+    hz: (i + 1) * 25,
     amp: +(Math.max(0.1, Math.sin(i / 3) * 0.6 + (i === 12 || i === 13 ? 1.8 : 0) + ((i * 7 + asset.id.length) % 5) * 0.05)).toFixed(2),
   }));
-  const rul = asset.health === "critical" ? "9–14 days" : asset.health === "warning" ? "30–45 days" : "> 180 days";
-  const confidence = asset.health === "critical" ? 0.87 : asset.health === "warning" ? 0.72 : 0.58;
+  const fftPeak = spectrum.reduce((m, d, i) => (d.amp > spectrum[m].amp ? i : m), 0);
+  const fftPeakHz = spectrum[fftPeak].hz;
 
   return (
     <AppLayout
