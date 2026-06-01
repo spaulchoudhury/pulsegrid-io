@@ -5,13 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Activity, BookOpen, Copy, KeyRound, Plug, Webhook } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Activity, BookOpen, Copy, KeyRound, Plug, Webhook, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/api")({
   head: () => ({ meta: [{ title: "API & Integrations · PulseGrid" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ focus: (s.focus as string) || "" }),
   component: ApiPage,
 });
+
 
 const endpoints = [
   { m: "POST", p: "/v1/ingest/vibration", d: "Stream raw or aggregated vibration samples from gateways.", docs: "https://docs.pulsegrid.io/ingest" },
