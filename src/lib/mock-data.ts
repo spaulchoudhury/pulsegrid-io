@@ -296,7 +296,7 @@ export const regions = [
 
 export const getTenant = (id: string) => tenants.find((t) => t.id === id) ?? tenants[0];
 
-// Per-tenant seeded trend; deterministic
+// Per-tenant seeded trend; deterministic (legacy flat shape)
 export function vibrationTrendFor(seed: string) {
   let s = 0;
   for (let i = 0; i < seed.length; i++) s += seed.charCodeAt(i);
@@ -313,6 +313,51 @@ export function vibrationTrendFor(seed: string) {
       threshold: 5,
     };
   });
+}
+
+// Asset-aware trend — converges to asset.vibrationRms at most recent timestamp
+export function vibrationTrendForAsset(tenantSeed: string, asset: Asset) {
+  const seed = `${tenantSeed}-${asset.id}`;
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) s += seed.charCodeAt(i);
+  const rand = (i: number) => {
+    const x = Math.sin(s + i * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const peak = asset.vibrationRms;
+  const baselineFactor = asset.health === "healthy" ? 0.9 : asset.health === "warning" ? 0.5 : 0.32;
+  const baseline = Math.max(0.6, peak * baselineFactor);
+  const exp = asset.health === "critical" ? 2.4 : asset.health === "warning" ? 1.6 : 1;
+  return Array.from({ length: 48 }, (_, i) => {
+    const noise = (rand(i) - 0.5) * 0.22;
+    const tFrac = i / 47;
+    const trend = asset.health === "healthy"
+      ? baseline + Math.sin(i / 5) * 0.18
+      : baseline + (peak - baseline) * Math.pow(tFrac, exp);
+    return {
+      t: `${String(i).padStart(2, "0")}:00`,
+      rms: +Math.max(0.2, trend + noise).toFixed(2),
+      threshold: 5,
+    };
+  });
+}
+
+// Asset-specific FFT — peak frequency and amplitude vary per asset
+export function fftSpectrumForAsset(asset: Asset) {
+  let s = 0;
+  for (let i = 0; i < asset.id.length; i++) s += asset.id.charCodeAt(i);
+  const peakBin = 5 + (s % 22); // bin 5..26 → 150..675 Hz
+  const peakHz = (peakBin + 1) * 25;
+  const peakAmp = +(asset.vibrationRms * 0.28 + 0.35).toFixed(2);
+  const bins = Array.from({ length: 32 }, (_, i) => {
+    const x = Math.sin(s * 0.31 + i * 1.7) * 43758.5453;
+    const r = x - Math.floor(x);
+    const noise = 0.05 + r * 0.22;
+    const harmonic = Math.exp(-Math.pow(i - peakBin, 2) / 1.4) * peakAmp;
+    const sideband = (i === peakBin - 2 || i === peakBin + 2) ? peakAmp * 0.32 : 0;
+    return { hz: (i + 1) * 25, amp: +(noise + harmonic + sideband).toFixed(2) };
+  });
+  return { peakHz, peakBin, peakAmp, bins };
 }
 
 export function fleetUptimeFor(seed: string) {
