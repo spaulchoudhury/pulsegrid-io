@@ -97,7 +97,7 @@ function buildNotifications(t: TenantData): Notification[] {
       detail: "Gateway → /v1/ingest returning 502 (3/min)",
       ts: "4m ago",
       read: false,
-      href: "/api",
+      href: "/api?focus=errors",
     });
   }
   return out;
