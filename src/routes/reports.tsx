@@ -139,13 +139,16 @@ function ReportsPage() {
                     <CalendarClock className="size-3" /> Recipients: {r.recipients} · Next: {r.next}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toast.success(`Editing ${r.name}`)}>Edit</Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { log("Downloaded report", r.name); toast.success(`${r.name} · PDF generated`); }}>
-                  <Download className="size-3 mr-1" />PDF
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => viewReport(r.name)}>
+                  <Eye className="size-3 mr-1" />View
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => downloadReport(r.name)}>
+                  <Download className="size-3 mr-1" />Download
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigator.clipboard?.writeText(`https://${tenant.subdomain}.pulsegrid.io/reports/${r.id}`); toast.success("Share link copied"); }}>
                   <Share2 className="size-3 mr-1" />Share link
                 </Button>
+
               </div>
             ))}
             {filtered.length === 0 && (
