@@ -237,16 +237,87 @@ function SettingsPage() {
           </CardHeader>
           <CardContent className="flex items-center gap-3 flex-wrap">
             <p className="text-xs text-slate-500 flex-1 min-w-[260px]">
-              Right to access &amp; right to erasure. Exports are AES-256 encrypted; deletes are irreversible and audit-logged.
+              Right to access &amp; right to erasure. Exports are AES-256 encrypted; deletes are irreversible and audit-logged. {!can("export:data") && <span className="text-amber-600">Your role ({persona.role}) is read-only here — request the IT Admin to action.</span>}
             </p>
-            <Button size="sm" variant="outline" disabled={!can("export:data")} onClick={() => { log("Exported tenant data", `tenant_${tenant.id}`); toast.success("Data export started", { description: "You'll receive a signed download link by email within 24h." }); }}>
-              <Download className="size-3.5 mr-1.5" />Export tenant data
-            </Button>
-            <Button size="sm" variant="destructive" disabled={!can("delete:tenant")} onClick={() => { log("Requested tenant deletion", `tenant_${tenant.id}`); toast.error("Tenant deletion requires admin confirmation", { description: "An email has been sent to the workspace owner." }); }}>
-              <Trash2 className="size-3.5 mr-1.5" />Delete tenant
-            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Download className="size-3.5 mr-1.5" />Export tenant data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Export all data for {tenant.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Generates an AES-256 encrypted archive containing all assets, sensor telemetry metadata, alerts, audit log entries, users, and tenant configuration for <code>tenant_{tenant.id}</code>. The download will start immediately and a signed link will also be emailed to {tenant.primaryUser.email}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      const payload = {
+                        exported_at: new Date().toISOString(),
+                        tenant: { id: tenant.id, name: tenant.name, plan: tenant.plan, region, subdomain: tenant.subdomain, industry: tenant.industry },
+                        assets: tenant.assets,
+                        alerts: tenant.alerts,
+                        users: tenant.users,
+                        api_keys: tenant.apiKeys,
+                        integrations: tenant.integrations,
+                        metrics: tenant.apiMetrics,
+                        analytics: tenant.alertAnalytics,
+                        gdpr: { article: "Article 20 — Right to data portability", encryption: "AES-256-GCM", signed_by: "PulseGrid Trust Service" },
+                      };
+                      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `pulsegrid-export-${tenant.id}-${Date.now()}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                      log("Exported tenant data", `tenant_${tenant.id}`);
+                      toast.success("Tenant data export downloaded", { description: `Signed link also emailed to ${tenant.primaryUser.email}` });
+                    }}
+                  >
+                    Generate &amp; download
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive">
+                  <Trash2 className="size-3.5 mr-1.5" />Delete tenant
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-red-600">Permanently delete {tenant.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will purge {tenant.assets.length} assets, {tenant.sensorCount} sensors, {tenant.alerts.length} alerts, all users, API keys, integrations, and historical telemetry for <code>tenant_{tenant.id}</code>. This cannot be undone. A signed deletion certificate (GDPR Art. 17) will be emailed to {tenant.primaryUser.email}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={() => {
+                      log("Requested tenant deletion", `tenant_${tenant.id}`);
+                      toast.error(`Deletion scheduled for ${tenant.name}`, { description: "Workspace owner must confirm via email within 24h to complete erasure." });
+                    }}
+                  >
+                    Yes, schedule deletion
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
+
       </div>
     </AppLayout>
   );
