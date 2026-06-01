@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CalendarClock, Download, FileText, Plus, Share2, ShieldCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { CalendarClock, Download, Eye, FileText, Plus, Share2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { TenantData } from "@/lib/mock-data";
+
 
 export const Route = createFileRoute("/reports")({
   head: () => ({ meta: [{ title: "Reports · PulseGrid" }] }),
