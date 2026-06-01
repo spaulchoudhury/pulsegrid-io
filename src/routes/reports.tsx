@@ -176,12 +176,29 @@ function ReportsPage() {
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">{t.desc}</div>
                 </div>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { log("Generated report", t.name); toast.success(`Generating ${t.name}…`); }}>Generate</Button>
+                <div className="flex flex-col gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => viewReport(t.name)}><Eye className="size-3 mr-1" />View</Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => downloadReport(t.name)}><Download className="size-3 mr-1" />Generate</Button>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{viewing?.title}</DialogTitle>
+            <DialogDescription>{tenant.name} · preview · click Download to save as CSV</DialogDescription>
+          </DialogHeader>
+          <pre className="bg-slate-950 text-slate-100 text-[11px] rounded-md p-4 overflow-auto font-mono leading-relaxed max-h-[60vh] whitespace-pre-wrap">{viewing?.content}</pre>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Close</Button>
+            <Button size="sm" onClick={() => viewing && downloadReport(viewing.title)}><Download className="size-3.5 mr-1.5" />Download CSV</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
