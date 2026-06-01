@@ -1,7 +1,7 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
 import { useApp } from "@/lib/app-context";
-import { vibrationTrendFor } from "@/lib/mock-data";
+import { vibrationTrendForAsset, fftSpectrumForAsset } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,18 @@ export const Route = createFileRoute("/assets/$assetId")({
   component: AssetDetail,
 });
 
+function scoreColor(s: number) {
+  if (s >= 80) return "text-emerald-600";
+  if (s >= 50) return "text-amber-600";
+  return "text-red-600";
+}
+
 function AssetDetail() {
   const { assetId } = Route.useParams();
   const { tenant } = useApp();
   const asset = tenant.assets.find((a) => a.id === assetId);
 
   if (!asset) {
-    // Tenant may have been switched — show graceful state
     return (
       <AppLayout title="Asset not in this tenant" subtitle={`${assetId} is not part of ${tenant.name}`}>
         <Card><CardContent className="p-6 text-sm text-slate-600 dark:text-slate-300">
@@ -34,29 +39,30 @@ function AssetDetail() {
     );
   }
 
-  const trend = vibrationTrendFor(`${tenant.id}-${asset.id}`);
-  // Fleet average per timestamp across other assets
-  const otherTrends = tenant.assets.filter((a) => a.id !== asset.id).map((a) => vibrationTrendFor(`${tenant.id}-${a.id}`));
+  const trend = vibrationTrendForAsset(tenant.id, asset);
+  const otherTrends = tenant.assets.filter((a) => a.id !== asset.id).map((a) => vibrationTrendForAsset(tenant.id, a));
   const merged = trend.map((d, i) => {
     const fleetAvg = otherTrends.length
       ? +(otherTrends.reduce((s, t) => s + (t[i]?.rms ?? 0), 0) / otherTrends.length).toFixed(2)
       : 0;
     return { t: d.t, rms: d.rms, fleet: fleetAvg };
   });
-  const peak = merged.reduce((m, d, i) => (d.rms > merged[m].rms ? i : m), 0);
+  const peakIdx = merged.reduce((m, d, i) => (d.rms > merged[m].rms ? i : m), 0);
+  const peakValue = merged[peakIdx].rms;
   const fleetAvgOverall = +(merged.reduce((s, d) => s + d.fleet, 0) / merged.length).toFixed(2);
   const assetAvg = +(merged.reduce((s, d) => s + d.rms, 0) / merged.length).toFixed(2);
   const deltaPct = fleetAvgOverall > 0 ? Math.round(((assetAvg - fleetAvgOverall) / fleetAvgOverall) * 100) : 0;
+  const trendDeltaPct = Math.round(((merged[merged.length - 1].rms - merged[0].rms) / Math.max(0.1, merged[0].rms)) * 100);
 
-  // FFT peaks — annotate dominant frequency
-  const spectrum = Array.from({ length: 32 }, (_, i) => ({
-    hz: (i + 1) * 25,
-    amp: +(Math.max(0.1, Math.sin(i / 3) * 0.6 + (i === 12 || i === 13 ? 1.8 : 0) + ((i * 7 + asset.id.length) % 5) * 0.05)).toFixed(2),
-  }));
-  const fftPeak = spectrum.reduce((m, d, i) => (d.amp > spectrum[m].amp ? i : m), 0);
-  const fftPeakHz = spectrum[fftPeak].hz;
+  const { bins: spectrum, peakHz, peakAmp } = fftSpectrumForAsset(asset);
+
   const rul = asset.health === "critical" ? "9–14 days" : asset.health === "warning" ? "30–45 days" : "> 180 days";
   const confidence = asset.health === "critical" ? 0.87 : asset.health === "warning" ? 0.72 : 0.58;
+  const faultLabel = asset.health === "critical"
+    ? `Bearing outer-race defect (BPFO @ ${peakHz} Hz) emerging`
+    : asset.health === "warning"
+      ? `Early-stage anomaly — energy concentrating near ${peakHz} Hz`
+      : `Operating within learned baseline (dominant ${peakHz} Hz is design-normal)`;
 
   return (
     <AppLayout
@@ -72,8 +78,15 @@ function AssetDetail() {
       }
     >
       <div className="grid grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Health</div><div className="mt-2"><HealthBadge h={asset.health} /></div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Vibration RMS</div><div className="text-2xl font-semibold mt-1 tabular-nums">{asset.vibrationRms} <span className="text-xs text-slate-400">mm/s</span></div></CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-slate-500">Health</div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className={`text-2xl font-semibold tabular-nums ${scoreColor(asset.healthScore)}`}>{asset.healthScore}</span>
+            <span className="text-xs text-slate-400">/100</span>
+          </div>
+          <div className="mt-1.5"><HealthBadge h={asset.health} /></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Vibration RMS</div><div className="text-2xl font-semibold mt-1 tabular-nums">{asset.vibrationRms} <span className="text-xs text-slate-400">mm/s</span></div><div className="text-[11px] text-slate-500 mt-1">48h peak: {peakValue} mm/s</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Temperature</div><div className="text-2xl font-semibold mt-1 tabular-nums">{asset.tempC}°C</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Last sensor sync</div><div className="text-2xl font-semibold mt-1">{asset.lastSync}</div></CardContent></Card>
       </div>
@@ -88,15 +101,10 @@ function AssetDetail() {
         </CardHeader>
         <CardContent className="text-sm text-slate-700 dark:text-slate-300 space-y-2">
           <p>
-            {asset.health === "critical"
-              ? "Bearing outer-race defect frequency (BPFO) is emerging in the spectrum."
-              : asset.health === "warning"
-                ? "Vibration trend rising — early-stage anomaly detected by autoencoder baseline."
-                : "Operating within learned baseline. No anomaly signal in the last 7 days."}
-            {" "}Estimated <span className="font-semibold">remaining useful life: {rul}</span>.
+            {faultLabel}. Current RMS <span className="font-semibold">{asset.vibrationRms} mm/s</span> ({trendDeltaPct >= 0 ? "+" : ""}{trendDeltaPct}% over 48h, {deltaPct >= 0 ? "+" : ""}{deltaPct}% vs fleet). Estimated <span className="font-semibold">remaining useful life: {rul}</span>.
           </p>
           <p className="text-xs text-slate-600 dark:text-slate-400">
-            Recommended action: {asset.health === "healthy" ? "continue monitoring." : "schedule inspection within the next planned shutdown window."}
+            Recommended action: {asset.health === "healthy" ? "continue monitoring." : asset.health === "warning" ? "schedule inspection within the next planned shutdown window." : "stage replacement parts and schedule shutdown within RUL window."}
           </p>
         </CardContent>
       </Card>
@@ -118,21 +126,21 @@ function AssetDetail() {
               <LineChart data={merged} margin={{ left: 0, right: 40, top: 20, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="t" tick={{ fontSize: 10, fill: "#64748b" }} interval={5} label={{ value: "Time (hh:mm)", position: "insideBottom", offset: -2, fontSize: 10, fill: "#94a3b8" }} />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={[0, 10]} label={{ value: "RMS (mm/s)", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8" }} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={[0, (dataMax: number) => Math.max(10, Math.ceil(dataMax + 1))]} label={{ value: "RMS (mm/s)", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8" }} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
                 <ReferenceLine y={5} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: "Critical 5.0", fontSize: 9, fill: "#f59e0b", position: "right" }} />
                 <Line type="monotone" dataKey="fleet" name="Fleet avg" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="rms" name={asset.id} stroke="#ef4444" strokeWidth={2.2} dot={false} />
-                {asset.health === "critical" && (
-                  <ReferenceDot x={merged[peak].t} y={merged[peak].rms} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2}>
-                    <RLabel value={`BPFO · ${merged[peak].rms}`} fontSize={10} fill="#ef4444" position="top" offset={10} />
+                {asset.health !== "healthy" && (
+                  <ReferenceDot x={merged[peakIdx].t} y={merged[peakIdx].rms} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2}>
+                    <RLabel value={`${asset.health === "critical" ? "BPFO" : "peak"} · ${merged[peakIdx].rms}`} fontSize={10} fill="#ef4444" position="top" offset={10} />
                   </ReferenceDot>
                 )}
               </LineChart>
             </ResponsiveContainer>
             <div className={`mt-1 text-[11px] ${deltaPct > 30 ? "text-red-600" : deltaPct > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-              {asset.id} is {deltaPct >= 0 ? `${deltaPct}% above` : `${Math.abs(deltaPct)}% below`} fleet average ({assetAvg} vs {fleetAvgOverall} mm/s) — {deltaPct > 30 ? "investigate immediately." : "within expected band."}
+              {asset.id} is {deltaPct >= 0 ? `${deltaPct}% above` : `${Math.abs(deltaPct)}% below`} fleet average ({assetAvg} vs {fleetAvgOverall} mm/s) — {deltaPct > 30 ? "investigate immediately." : deltaPct > 0 ? "monitor closely." : "within expected band."}
             </div>
           </CardContent>
         </Card>
@@ -147,11 +155,11 @@ function AssetDetail() {
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "Amplitude (mm/s²)", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8" }} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v: number) => [`${v} mm/s²`, "Amplitude"]} labelFormatter={(l) => `${l} Hz`} />
                 <Bar dataKey="amp" fill="#6366f1" radius={[2, 2, 0, 0]} />
-                <ReferenceLine x={fftPeakHz} stroke="#ef4444" strokeDasharray="3 3" label={{ value: `BPFO ${fftPeakHz}Hz · bearing defect`, fontSize: 9, fill: "#ef4444", position: "top" }} />
+                <ReferenceLine x={peakHz} stroke="#ef4444" strokeDasharray="3 3" label={{ value: `${asset.health === "critical" ? "BPFO" : "dominant"} ${peakHz}Hz · ${peakAmp}`, fontSize: 9, fill: "#ef4444", position: "top" }} />
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-1 text-[11px] text-slate-500">
-              Dominant peak at {fftPeakHz} Hz isolates the failing bearing outer race — matches BPFO for this geometry.
+              Dominant peak at {peakHz} Hz {asset.health === "critical" ? "matches BPFO for this bearing geometry — outer-race defect." : asset.health === "warning" ? "is rising above baseline — early bearing wear suspected." : "is the asset's design-normal running frequency."}
             </div>
           </CardContent>
         </Card>
@@ -174,13 +182,13 @@ function AssetDetail() {
               {Array.from({ length: 5 }, (_, i) => {
                 const base = asset.vibrationRms;
                 const rms = (base + (Math.sin(i + asset.id.length) * 0.2)).toFixed(2);
-                const peak = (base * 1.8 + i * 0.1).toFixed(1);
+                const pk = (base * 1.8 + i * 0.1).toFixed(1);
                 return [
                   `10:14:${22 - i}`,
                   `${asset.id}-A${(i % 2) + 1}`,
                   i % 2 === 0 ? "radial" : "axial",
                   rms,
-                  peak,
+                  pk,
                 ];
               }).map((r, i) => (
                 <tr key={i} className="border-b border-slate-50 dark:border-slate-800 last:border-0">

@@ -5,13 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Activity, BookOpen, Copy, KeyRound, Plug, Webhook } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Activity, BookOpen, Copy, KeyRound, Plug, Webhook, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/api")({
   head: () => ({ meta: [{ title: "API & Integrations · PulseGrid" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ focus: (s.focus as string) || "" }),
   component: ApiPage,
 });
+
 
 const endpoints = [
   { m: "POST", p: "/v1/ingest/vibration", d: "Stream raw or aggregated vibration samples from gateways.", docs: "https://docs.pulsegrid.io/ingest" },
@@ -23,7 +27,23 @@ const endpoints = [
 
 function ApiPage() {
   const { tenant, can, log } = useApp();
+  const { focus } = Route.useSearch();
   const m = tenant.apiMetrics;
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [latencyOpen, setLatencyOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [callsOpen, setCallsOpen] = useState(false);
+
+  useEffect(() => {
+    if (focus === "errors") setErrorOpen(true);
+  }, [focus]);
+
+  const failingEndpoints = [
+    { p: "POST /v1/ingest/vibration", code: 502, count: 18, lastSeen: "12s ago", cause: "Upstream gateway timeout" },
+    { p: "POST /v1/ingest/vibration", code: 429, count: 7, lastSeen: "1m ago", cause: "Rate limit burst from edge gateway" },
+    { p: "GET /v1/alerts", code: 500, count: 2, lastSeen: "3m ago", cause: "Transient query timeout" },
+  ];
+
 
   const sample = `curl -X POST https://api.pulsegrid.io/v1/ingest/vibration \\
   -H "Authorization: Bearer $PULSEGRID_API_KEY" \\
@@ -59,30 +79,121 @@ function ApiPage() {
         </>
       }
     >
-      {/* API metrics */}
+      {/* API metrics — clickable for drill-down */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-slate-500 flex items-center gap-1"><Activity className="size-3" /> Calls today</div>
-          <div className="text-2xl font-semibold mt-1 tabular-nums">{m.callsToday.toLocaleString()}</div>
-          <div className="text-[11px] text-slate-500">of {m.rateLimit.toLocaleString()} / day</div>
-          <Progress value={m.rateUsedPct} className="h-1.5 mt-2" />
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-slate-500">Rate limit used</div>
-          <div className="text-2xl font-semibold mt-1">{m.rateUsedPct}%</div>
-          <div className="text-[11px] text-slate-500">{tenant.plan} tier</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-slate-500">p95 latency</div>
-          <div className="text-2xl font-semibold mt-1 tabular-nums">{m.p95LatencyMs} ms</div>
-          <div className="text-[11px] text-slate-500">ingest → ack</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-slate-500">Error rate</div>
-          <div className={`text-2xl font-semibold mt-1 tabular-nums ${m.errorRatePct > 1 ? "text-amber-600" : "text-emerald-600"}`}>{m.errorRatePct}%</div>
-          <div className="text-[11px] text-slate-500">{m.webhookDeliveries.toLocaleString()} webhook deliveries</div>
-        </CardContent></Card>
+        <Card className={`cursor-pointer transition hover:shadow-md hover:border-slate-300 ${focus === "errors" ? "" : ""}`} onClick={() => setCallsOpen(true)}>
+          <CardContent className="p-4">
+            <div className="text-xs text-slate-500 flex items-center gap-1"><Activity className="size-3" /> Calls today</div>
+            <div className="text-2xl font-semibold mt-1 tabular-nums">{m.callsToday.toLocaleString()}</div>
+            <div className="text-[11px] text-slate-500">of {m.rateLimit.toLocaleString()} / day</div>
+            <Progress value={m.rateUsedPct} className="h-1.5 mt-2" />
+            <div className="text-[10px] text-indigo-600 mt-1.5">Click for traffic breakdown →</div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer transition hover:shadow-md hover:border-slate-300" onClick={() => setRateOpen(true)}>
+          <CardContent className="p-4">
+            <div className="text-xs text-slate-500">Rate limit used</div>
+            <div className="text-2xl font-semibold mt-1">{m.rateUsedPct}%</div>
+            <div className="text-[11px] text-slate-500">{tenant.plan} tier</div>
+            <div className="text-[10px] text-indigo-600 mt-1.5">Click to upgrade limits →</div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer transition hover:shadow-md hover:border-slate-300" onClick={() => setLatencyOpen(true)}>
+          <CardContent className="p-4">
+            <div className="text-xs text-slate-500">p95 latency</div>
+            <div className="text-2xl font-semibold mt-1 tabular-nums">{m.p95LatencyMs} ms</div>
+            <div className="text-[11px] text-slate-500">ingest → ack</div>
+            <div className="text-[10px] text-indigo-600 mt-1.5">Click for latency breakdown →</div>
+          </CardContent>
+        </Card>
+        <Card
+          className={`cursor-pointer transition hover:shadow-md ${m.errorRatePct > 1 ? "border-amber-300 bg-amber-50/40 dark:bg-amber-950/20" : "hover:border-slate-300"} ${focus === "errors" ? "ring-2 ring-amber-400" : ""}`}
+          onClick={() => setErrorOpen(true)}
+        >
+          <CardContent className="p-4">
+            <div className="text-xs text-slate-500 flex items-center gap-1">Error rate {m.errorRatePct > 1 && <AlertTriangle className="size-3 text-amber-600" />}</div>
+            <div className={`text-2xl font-semibold mt-1 tabular-nums ${m.errorRatePct > 1 ? "text-amber-600" : "text-emerald-600"}`}>{m.errorRatePct}%</div>
+            <div className="text-[11px] text-slate-500">{m.webhookDeliveries.toLocaleString()} webhook deliveries</div>
+            <div className="text-[10px] text-indigo-600 mt-1.5">{m.errorRatePct > 1 ? "Click to triage errors →" : "Click for error log →"}</div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Error triage dialog */}
+      <Dialog open={errorOpen} onOpenChange={setErrorOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="size-4 text-amber-600" /> API integration errors — last 15 min</DialogTitle>
+            <DialogDescription>
+              Current error rate <strong>{m.errorRatePct}%</strong> across {tenant.name}'s ingestion endpoints. Triage failing endpoints below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="border rounded-md divide-y divide-slate-100 dark:divide-slate-800">
+            {failingEndpoints.map((e, i) => (
+              <div key={i} className="p-3 flex items-center gap-3 flex-wrap">
+                <Badge variant="outline" className={`text-[10px] font-mono ${e.code >= 500 ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>{e.code}</Badge>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-mono">{e.p}</div>
+                  <div className="text-[11px] text-slate-500">{e.cause} · {e.count} occurrences · last {e.lastSeen}</div>
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => { log("Retried failed endpoint", e.p); toast.success(`Retry queued for ${e.p}`); }}>
+                  <RefreshCw className="size-3 mr-1" />Retry
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-slate-500">
+            Recommended: rotate the affected ingestion key, scale gateway worker pool, or raise a ticket with PulseGrid support.
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setErrorOpen(false)}>Close</Button>
+            <Button size="sm" onClick={() => { log("Opened support ticket", "API errors"); toast.success("Support ticket #PG-8821 opened"); setErrorOpen(false); }}>Open support ticket</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={callsOpen} onOpenChange={setCallsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Traffic breakdown · today</DialogTitle>
+            <DialogDescription>{m.callsToday.toLocaleString()} calls so far across {tenant.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-2">
+            <div className="flex justify-between"><span>POST /v1/ingest/vibration</span><span className="font-mono">{Math.round(m.callsToday * 0.78).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>GET /v1/assets/*/health</span><span className="font-mono">{Math.round(m.callsToday * 0.12).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>GET /v1/alerts</span><span className="font-mono">{Math.round(m.callsToday * 0.07).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>Other</span><span className="font-mono">{Math.round(m.callsToday * 0.03).toLocaleString()}</span></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rateOpen} onOpenChange={setRateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rate limits — {tenant.plan} tier</DialogTitle>
+            <DialogDescription>Used {m.rateUsedPct}% of {m.rateLimit.toLocaleString()} daily calls.</DialogDescription>
+          </DialogHeader>
+          <Progress value={m.rateUsedPct} className="h-2" />
+          <div className="text-xs text-slate-500">Upgrade to Enterprise for 5M calls/day + dedicated throughput.</div>
+          <DialogFooter><Button size="sm" onClick={() => { toast.success("Upgrade request sent to billing"); setRateOpen(false); }}>Request upgrade</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={latencyOpen} onOpenChange={setLatencyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>p95 latency breakdown</DialogTitle>
+            <DialogDescription>End-to-end ingest → ack across the last hour.</DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-2">
+            <div className="flex justify-between"><span>Edge gateway → API</span><span className="font-mono">{Math.round(m.p95LatencyMs * 0.35)} ms</span></div>
+            <div className="flex justify-between"><span>API validation + auth</span><span className="font-mono">{Math.round(m.p95LatencyMs * 0.15)} ms</span></div>
+            <div className="flex justify-between"><span>Stream → time-series store</span><span className="font-mono">{Math.round(m.p95LatencyMs * 0.30)} ms</span></div>
+            <div className="flex justify-between"><span>ML scoring + ack</span><span className="font-mono">{Math.round(m.p95LatencyMs * 0.20)} ms</span></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <Card className="md:col-span-2">

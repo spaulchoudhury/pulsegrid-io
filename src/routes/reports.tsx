@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CalendarClock, Download, FileText, Plus, Share2, ShieldCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { CalendarClock, Download, Eye, FileText, Plus, Share2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { TenantData } from "@/lib/mock-data";
+
 
 export const Route = createFileRoute("/reports")({
   head: () => ({ meta: [{ title: "Reports · PulseGrid" }] }),
@@ -32,6 +35,7 @@ const TEMPLATES = [
 function ReportsPage() {
   const { tenant, log } = useApp();
   const [tab, setTab] = useState<"Weekly" | "Monthly" | "Custom">("Weekly");
+  const [viewing, setViewing] = useState<{ title: string; content: string } | null>(null);
 
   const [reports, setReports] = useState<ScheduledReport[]>([
     { id: "r-001", name: "Fleet Health Summary", cadence: "Weekly", recipients: `plant-manager@${tenant.subdomain}.com`, next: "Monday 08:00" },
@@ -40,6 +44,55 @@ function ReportsPage() {
   ]);
 
   const filtered = reports.filter((r) => r.cadence === tab);
+
+  const buildReport = (name: string, t: TenantData) => {
+    const ts = new Date().toISOString();
+    const lines = [
+      `PulseGrid — ${name}`,
+      `Tenant: ${t.name} (tenant_${t.id})  ·  Region: ${t.region}  ·  Plan: ${t.plan}`,
+      `Generated: ${ts}`,
+      `SLA: ${t.sla}  ·  Sensors: ${t.sensorCount}  ·  Assets: ${t.assets.length}`,
+      "",
+      "ASSET HEALTH",
+      "asset_id,name,site,type,health,score,vibration_rms_mm_s,temp_c,last_sync",
+      ...t.assets.map((a) => `${a.id},${a.name},${a.site},${a.type},${a.health},${a.healthScore},${a.vibrationRms},${a.tempC},${a.lastSync}`),
+      "",
+      "ALERTS (last period)",
+      "alert_id,asset_id,severity,rule,fault_type,confidence,acknowledged,assignee",
+      ...t.alerts.map((a) => `${a.id},${a.assetId},${a.severity},"${a.rule}","${a.faultType}",${a.confidence},${a.ack},${a.assignee ?? "—"}`),
+      "",
+      "ALERT ANALYTICS",
+      `MTTA: ${t.alertAnalytics.mttaHours} h  ·  Alert → WO conversion: ${t.alertAnalytics.conversionPct}%`,
+      `Top fault: ${t.alertAnalytics.topFault} (${t.alertAnalytics.topFaultPct}%)  ·  False-positive: ${t.alertAnalytics.falsePositivePct}%`,
+      "",
+      "API USAGE",
+      `Calls today: ${t.apiMetrics.callsToday}  ·  Rate used: ${t.apiMetrics.rateUsedPct}%  ·  p95: ${t.apiMetrics.p95LatencyMs} ms  ·  Errors: ${t.apiMetrics.errorRatePct}%`,
+      "",
+      `— end of report —`,
+    ];
+    return lines.join("\n");
+  };
+
+  const downloadReport = (name: string) => {
+    const content = buildReport(name, tenant);
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tenant.id}-${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    log("Downloaded report", name);
+    toast.success(`${name} downloaded`, { description: `${tenant.id}-${name.toLowerCase().replace(/\s+/g, "-")}.csv` });
+  };
+
+  const viewReport = (name: string) => {
+    setViewing({ title: name, content: buildReport(name, tenant) });
+    log("Viewed report", name);
+  };
+
 
   return (
     <AppLayout
@@ -86,13 +139,16 @@ function ReportsPage() {
                     <CalendarClock className="size-3" /> Recipients: {r.recipients} · Next: {r.next}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toast.success(`Editing ${r.name}`)}>Edit</Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { log("Downloaded report", r.name); toast.success(`${r.name} · PDF generated`); }}>
-                  <Download className="size-3 mr-1" />PDF
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => viewReport(r.name)}>
+                  <Eye className="size-3 mr-1" />View
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => downloadReport(r.name)}>
+                  <Download className="size-3 mr-1" />Download
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigator.clipboard?.writeText(`https://${tenant.subdomain}.pulsegrid.io/reports/${r.id}`); toast.success("Share link copied"); }}>
                   <Share2 className="size-3 mr-1" />Share link
                 </Button>
+
               </div>
             ))}
             {filtered.length === 0 && (
@@ -120,12 +176,29 @@ function ReportsPage() {
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">{t.desc}</div>
                 </div>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { log("Generated report", t.name); toast.success(`Generating ${t.name}…`); }}>Generate</Button>
+                <div className="flex flex-col gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => viewReport(t.name)}><Eye className="size-3 mr-1" />View</Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => downloadReport(t.name)}><Download className="size-3 mr-1" />Generate</Button>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{viewing?.title}</DialogTitle>
+            <DialogDescription>{tenant.name} · preview · click Download to save as CSV</DialogDescription>
+          </DialogHeader>
+          <pre className="bg-slate-950 text-slate-100 text-[11px] rounded-md p-4 overflow-auto font-mono leading-relaxed max-h-[60vh] whitespace-pre-wrap">{viewing?.content}</pre>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Close</Button>
+            <Button size="sm" onClick={() => viewing && downloadReport(viewing.title)}><Download className="size-3.5 mr-1.5" />Download CSV</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
