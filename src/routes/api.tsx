@@ -27,7 +27,23 @@ const endpoints = [
 
 function ApiPage() {
   const { tenant, can, log } = useApp();
+  const { focus } = Route.useSearch();
   const m = tenant.apiMetrics;
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [latencyOpen, setLatencyOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [callsOpen, setCallsOpen] = useState(false);
+
+  useEffect(() => {
+    if (focus === "errors") setErrorOpen(true);
+  }, [focus]);
+
+  const failingEndpoints = [
+    { p: "POST /v1/ingest/vibration", code: 502, count: 18, lastSeen: "12s ago", cause: "Upstream gateway timeout" },
+    { p: "POST /v1/ingest/vibration", code: 429, count: 7, lastSeen: "1m ago", cause: "Rate limit burst from edge gateway" },
+    { p: "GET /v1/alerts", code: 500, count: 2, lastSeen: "3m ago", cause: "Transient query timeout" },
+  ];
+
 
   const sample = `curl -X POST https://api.pulsegrid.io/v1/ingest/vibration \\
   -H "Authorization: Bearer $PULSEGRID_API_KEY" \\
