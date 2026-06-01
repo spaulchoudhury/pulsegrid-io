@@ -289,8 +289,8 @@ export function AppLayout({ children, title, subtitle, actions }: {
                               navigate({ to: "/assets/$assetId", params: { assetId: n.assetId } });
                             } else if (n.alertId) {
                               navigate({ to: "/alerts", hash: n.alertId });
-                            } else if (n.href === "/api") {
-                              navigate({ to: "/api" });
+                            } else if (n.href?.startsWith("/api")) {
+                              navigate({ to: "/api", search: { focus: "errors" } });
                             }
                           }}
                           className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800 ${!n.read ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}
