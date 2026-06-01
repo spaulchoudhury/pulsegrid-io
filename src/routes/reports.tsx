@@ -35,6 +35,7 @@ const TEMPLATES = [
 function ReportsPage() {
   const { tenant, log } = useApp();
   const [tab, setTab] = useState<"Weekly" | "Monthly" | "Custom">("Weekly");
+  const [viewing, setViewing] = useState<{ title: string; content: string } | null>(null);
 
   const [reports, setReports] = useState<ScheduledReport[]>([
     { id: "r-001", name: "Fleet Health Summary", cadence: "Weekly", recipients: `plant-manager@${tenant.subdomain}.com`, next: "Monday 08:00" },
@@ -43,6 +44,55 @@ function ReportsPage() {
   ]);
 
   const filtered = reports.filter((r) => r.cadence === tab);
+
+  const buildReport = (name: string, t: TenantData) => {
+    const ts = new Date().toISOString();
+    const lines = [
+      `PulseGrid — ${name}`,
+      `Tenant: ${t.name} (tenant_${t.id})  ·  Region: ${t.region}  ·  Plan: ${t.plan}`,
+      `Generated: ${ts}`,
+      `SLA: ${t.sla}  ·  Sensors: ${t.sensorCount}  ·  Assets: ${t.assets.length}`,
+      "",
+      "ASSET HEALTH",
+      "asset_id,name,site,type,health,score,vibration_rms_mm_s,temp_c,last_sync",
+      ...t.assets.map((a) => `${a.id},${a.name},${a.site},${a.type},${a.health},${a.healthScore},${a.vibrationRms},${a.tempC},${a.lastSync}`),
+      "",
+      "ALERTS (last period)",
+      "alert_id,asset_id,severity,rule,fault_type,confidence,acknowledged,assignee",
+      ...t.alerts.map((a) => `${a.id},${a.assetId},${a.severity},"${a.rule}","${a.faultType}",${a.confidence},${a.ack},${a.assignee ?? "—"}`),
+      "",
+      "ALERT ANALYTICS",
+      `MTTA: ${t.alertAnalytics.mttaHours} h  ·  Alert → WO conversion: ${t.alertAnalytics.conversionPct}%`,
+      `Top fault: ${t.alertAnalytics.topFault} (${t.alertAnalytics.topFaultPct}%)  ·  False-positive: ${t.alertAnalytics.falsePositivePct}%`,
+      "",
+      "API USAGE",
+      `Calls today: ${t.apiMetrics.callsToday}  ·  Rate used: ${t.apiMetrics.rateUsedPct}%  ·  p95: ${t.apiMetrics.p95LatencyMs} ms  ·  Errors: ${t.apiMetrics.errorRatePct}%`,
+      "",
+      `— end of report —`,
+    ];
+    return lines.join("\n");
+  };
+
+  const downloadReport = (name: string) => {
+    const content = buildReport(name, tenant);
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tenant.id}-${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    log("Downloaded report", name);
+    toast.success(`${name} downloaded`, { description: `${tenant.id}-${name.toLowerCase().replace(/\s+/g, "-")}.csv` });
+  };
+
+  const viewReport = (name: string) => {
+    setViewing({ title: name, content: buildReport(name, tenant) });
+    log("Viewed report", name);
+  };
+
 
   return (
     <AppLayout
