@@ -60,6 +60,15 @@ interface AppCtx {
   signedIn: boolean;
   signIn: (personaKey: string, tenantId?: string) => void;
   signOut: () => void;
+  // Custom monitoring rules created via Overview > New rule
+  rules: MonitoringRule[];
+  addRule: (r: Omit<MonitoringRule, "id" | "tenantId" | "createdBy" | "createdAt" | "enabled">) => void;
+  toggleRule: (id: string) => void;
+  removeRule: (id: string) => void;
+  // Tenant-scoped user mgmt (additions/removals layered on top of seed users)
+  tenantUsers: TenantUser[];
+  addUser: (u: TenantUser) => void;
+  removeUser: (email: string) => void;
 }
 
 const Ctx = createContext<AppCtx | null>(null);
