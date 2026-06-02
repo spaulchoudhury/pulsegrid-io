@@ -288,33 +288,39 @@ function SettingsPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" variant="destructive">
-                  <Trash2 className="size-3.5 mr-1.5" />Delete tenant
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-red-600">Permanently delete {tenant.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will purge {tenant.assets.length} assets, {tenant.sensorCount} sensors, {tenant.alerts.length} alerts, all users, API keys, integrations, and historical telemetry for <code>tenant_{tenant.id}</code>. This cannot be undone. A signed deletion certificate (GDPR Art. 17) will be emailed to {tenant.primaryUser.email}.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-red-600 hover:bg-red-700"
-                    onClick={() => {
-                      log("Requested tenant deletion", `tenant_${tenant.id}`);
-                      toast.error(`Deletion scheduled for ${tenant.name}`, { description: "Workspace owner must confirm via email within 24h to complete erasure." });
-                    }}
-                  >
-                    Yes, schedule deletion
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {can("delete:tenant") ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="destructive">
+                    <Trash2 className="size-3.5 mr-1.5" />Delete tenant
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-600">Permanently delete {tenant.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will purge {tenant.assets.length} assets, {tenant.sensorCount} sensors, {tenant.alerts.length} alerts, all users, API keys, integrations, and historical telemetry for <code>tenant_{tenant.id}</code>. This cannot be undone. A signed deletion certificate (GDPR Art. 17) will be emailed to {tenant.primaryUser.email}.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={() => {
+                        log("Requested tenant deletion", `tenant_${tenant.id}`);
+                        toast.error(`Deletion scheduled for ${tenant.name}`, { description: "Workspace owner must confirm via email within 24h to complete erasure." });
+                      }}
+                    >
+                      Yes, schedule deletion
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button size="sm" variant="destructive" disabled title={`${persona.role} cannot delete tenants — IT Admin only`} className="opacity-50 cursor-not-allowed">
+                <Trash2 className="size-3.5 mr-1.5" />Delete tenant
+              </Button>
+            )}
           </CardContent>
         </Card>
 
