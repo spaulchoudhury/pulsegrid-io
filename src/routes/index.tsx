@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
 import { useApp } from "@/lib/app-context";
-import { fleetUptimeFor, vibrationTrendFor } from "@/lib/mock-data";
+import { fleetUptimeFor, vibrationTrendForAsset } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -155,7 +155,7 @@ function Overview() {
     () => tenant.assets.find((a) => a.id === chartAssetId) ?? tenant.assets[0],
     [chartAssetId, tenant]
   );
-  const trend = vibrationTrendFor(`${tenant.id}-${chartAsset.id}`);
+  const trend = vibrationTrendForAsset(tenant.id, chartAsset);
   const uptime = fleetUptimeFor(tenant.id);
   const critical = tenant.assets.filter((a) => a.health === "critical").length;
   const openAlerts = tenant.alerts.filter((a) => !a.ack).length;
@@ -205,7 +205,7 @@ function Overview() {
           </CardHeader>
           <CardContent className="h-72">
             {(() => {
-              const peak = trend.reduce((m, d, i) => (d.rms > trend[m].rms ? i : m), 0);
+              const peak = trend.reduce((m: number, d: { rms: number }, i: number) => (d.rms > trend[m].rms ? i : m), 0);
               const trendShift = Math.max(0, peak - 8);
               const alertIdx = Math.max(0, peak - 3);
               const peakPoint = trend[peak];
