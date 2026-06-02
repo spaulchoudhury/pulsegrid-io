@@ -205,7 +205,7 @@ function Overview() {
           </CardHeader>
           <CardContent className="h-72">
             {(() => {
-              const peak = trend.reduce((m, d, i) => (d.rms > trend[m].rms ? i : m), 0);
+              const peak = trend.reduce((m: number, d: { rms: number }, i: number) => (d.rms > trend[m].rms ? i : m), 0);
               const trendShift = Math.max(0, peak - 8);
               const alertIdx = Math.max(0, peak - 3);
               const peakPoint = trend[peak];
