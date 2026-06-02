@@ -39,11 +39,7 @@ function ApiPage() {
     if (focus === "errors") setErrorOpen(true);
   }, [focus]);
 
-  const failingEndpoints = [
-    { p: "POST /v1/ingest/vibration", code: 502, count: 18, lastSeen: "12s ago", cause: "Upstream gateway timeout" },
-    { p: "POST /v1/ingest/vibration", code: 429, count: 7, lastSeen: "1m ago", cause: "Rate limit burst from edge gateway" },
-    { p: "GET /v1/alerts", code: 500, count: 2, lastSeen: "3m ago", cause: "Transient query timeout" },
-  ];
+  const failingEndpoints = failingEndpointsFor(tenant);
 
 
   const sample = `curl -X POST https://api.pulsegrid.io/v1/ingest/vibration \\
