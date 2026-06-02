@@ -43,8 +43,8 @@ function SettingsPage() {
       title="Tenant Settings"
       subtitle={`Branding, security, data residency, and access for tenant_${tenant.id}`}
     >
-      {!wizardDismissed && (<div key={tenant.id}>
-        <Card className="mb-4 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/30">
+      {!wizardDismissed && (
+        <Card key={tenant.id} className="mb-4 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/30">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-indigo-600" />
