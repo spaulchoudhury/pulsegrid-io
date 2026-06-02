@@ -155,7 +155,7 @@ function Overview() {
     () => tenant.assets.find((a) => a.id === chartAssetId) ?? tenant.assets[0],
     [chartAssetId, tenant]
   );
-  const trend = vibrationTrendFor(`${tenant.id}-${chartAsset.id}`);
+  const trend = vibrationTrendForAsset(tenant.id, chartAsset);
   const uptime = fleetUptimeFor(tenant.id);
   const critical = tenant.assets.filter((a) => a.health === "critical").length;
   const openAlerts = tenant.alerts.filter((a) => !a.ack).length;
