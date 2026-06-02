@@ -161,14 +161,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const persona = useMemo(() => personaForTenant(tenant, personaKey), [tenant, personaKey]);
 
-  // Seed audit log per tenant for realism (reset on tenant change)
+  // Seed historical audit log per tenant (multi-day history)
   useEffect(() => {
-    const u = tenant.users;
-    setAudit([
-      { id: `seed-1-${tenant.id}`, ts: "2m ago", actor: u[1]?.name ?? u[0].name, tenantId: tenant.id, action: "Acknowledged alert", target: tenant.alerts[0]?.id ?? "—" },
-      { id: `seed-2-${tenant.id}`, ts: "18m ago", actor: u[0].name, tenantId: tenant.id, action: "Created work order", target: `WO-4799 ← ${tenant.alerts[2]?.id ?? "—"}` },
-      { id: `seed-3-${tenant.id}`, ts: "1h ago", actor: u[2]?.name ?? u[0].name, tenantId: tenant.id, action: "Rotated API key", target: "Production" },
-    ]);
+    setAudit(
+      seedAuditFor(tenant).map((e, i) => ({
+        id: `seed-${tenant.id}-${i}`,
+        ts: e.ts,
+        actor: e.actor,
+        tenantId: tenant.id,
+        action: e.action,
+        target: e.target,
+      }))
+    );
   }, [tenant]);
 
   const baseNotifs = useMemo(() => buildNotifications(tenant), [tenant]);
