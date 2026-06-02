@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppLayout, HealthBadge } from "@/components/app-layout";
 import { useApp } from "@/lib/app-context";
-import { fleetUptimeFor, vibrationTrendFor } from "@/lib/mock-data";
+import { fleetUptimeFor, vibrationTrendForAsset } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
