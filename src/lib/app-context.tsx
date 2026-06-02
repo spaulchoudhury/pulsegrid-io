@@ -136,6 +136,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [region, setRegion] = useState<string>("eu-west-1");
   const [signedIn, setSignedIn] = useState<boolean>(false);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [rules, setRules] = useState<MonitoringRule[]>([]);
+  const [extraUsers, setExtraUsers] = useState<Record<string, TenantUser[]>>({});
+  const [removedUserEmails, setRemovedUserEmails] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (typeof document === "undefined") return;
