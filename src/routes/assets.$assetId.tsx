@@ -152,8 +152,8 @@ function AssetDetail() {
               <BarChart data={spectrum} margin={{ left: 0, right: 8, top: 20, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="hz" tick={{ fontSize: 9, fill: "#64748b" }} interval={3} label={{ value: "Frequency (Hz)", position: "insideBottom", offset: -2, fontSize: 10, fill: "#94a3b8" }} />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "Amplitude (mm/s²)", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8" }} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v: number) => [`${v} mm/s²`, "Amplitude"]} labelFormatter={(l) => `${l} Hz`} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "mm/s RMS", angle: -90, position: "insideLeft", fontSize: 10, fill: "#94a3b8" }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v: number) => [`${v} mm/s RMS`, "Vibration"]} labelFormatter={(l) => `${l} Hz`} />
                 <Bar dataKey="amp" fill="#6366f1" radius={[2, 2, 0, 0]} />
                 <ReferenceLine x={peakHz} stroke="#ef4444" strokeDasharray="3 3" label={{ value: `${asset.health === "critical" ? "BPFO" : "dominant"} ${peakHz}Hz · ${peakAmp}`, fontSize: 9, fill: "#ef4444", position: "top" }} />
               </BarChart>
