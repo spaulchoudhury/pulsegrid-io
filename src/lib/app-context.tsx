@@ -205,9 +205,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const log = useCallback((action: string, target: string) => {
     setAudit((a) => [
-      { id: `ev-${Date.now()}`, ts: "just now", actor: persona.name, tenantId: tenant.id, action, target },
+      { id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, ts: "just now", actor: persona.name, tenantId: tenant.id, action, target },
       ...a,
-    ].slice(0, 25));
+    ].slice(0, 200));
   }, [persona.name, tenant.id]);
 
   const setPrimaryColor = useCallback((c: string) => setPrimaryColorState(c), []);
@@ -220,6 +220,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => {
     setSignedIn(false);
   }, []);
+
+  const tenantRules = useMemo(() => rules.filter((r) => r.tenantId === tenant.id), [rules, tenant.id]);
+  const addRule = useCallback((r: Omit<MonitoringRule, "id" | "tenantId" | "createdBy" | "createdAt" | "enabled">) => {
+    setRules((rs) => [
+      { ...r, id: `RL-${Date.now().toString(36).toUpperCase().slice(-5)}`, tenantId: tenant.id, createdBy: persona.name, createdAt: "just now", enabled: true },
+      ...rs,
+    ]);
+  }, [tenant.id, persona.name]);
+  const toggleRule = useCallback((id: string) => {
+    setRules((rs) => rs.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+  }, []);
+  const removeRule = useCallback((id: string) => {
+    setRules((rs) => rs.filter((r) => r.id !== id));
+  }, []);
+
+  const tenantUsers = useMemo(() => {
+    const removed = new Set(removedUserEmails[tenant.id] ?? []);
+    const base = tenant.users.filter((u) => !removed.has(u.email));
+    return [...base, ...(extraUsers[tenant.id] ?? [])];
+  }, [tenant, extraUsers, removedUserEmails]);
+  const addUser = useCallback((u: TenantUser) => {
+    setExtraUsers((x) => ({ ...x, [tenant.id]: [...(x[tenant.id] ?? []), u] }));
+  }, [tenant.id]);
+  const removeUser = useCallback((email: string) => {
+    setExtraUsers((x) => ({ ...x, [tenant.id]: (x[tenant.id] ?? []).filter((u) => u.email !== email) }));
+    setRemovedUserEmails((r) => ({ ...r, [tenant.id]: [...(r[tenant.id] ?? []), email] }));
+  }, [tenant.id]);
 
   return (
     <Ctx.Provider
@@ -234,6 +261,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         can,
         audit, log,
         signedIn, signIn, signOut,
+        rules: tenantRules, addRule, toggleRule, removeRule,
+        tenantUsers, addUser, removeUser,
       }}
     >
       {children}
