@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Check, Download, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Download, Sparkles, Trash2, UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -24,7 +25,12 @@ export const Route = createFileRoute("/settings")({
 const COLOR_PRESETS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#a855f7"];
 
 function SettingsPage() {
-  const { tenant, primaryColor, setPrimaryColor, region, setRegion, can, log, persona } = useApp();
+  const { tenant, primaryColor, setPrimaryColor, region, setRegion, can, log, persona, tenantUsers, addUser, removeUser } = useApp();
+  const canManageUsers = can("manage:users") || persona.role === "Reliability Manager";
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("Viewer");
   const [colorDraft, setColorDraft] = useState(primaryColor);
   const [nameDraft, setNameDraft] = useState(tenant.name);
   const [subDraft, setSubDraft] = useState(tenant.subdomain);
@@ -44,7 +50,7 @@ function SettingsPage() {
       subtitle={`Branding, security, data residency, and access for tenant_${tenant.id}`}
     >
       {!wizardDismissed && (
-        <Card className="mb-4 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/30">
+        <Card key={tenant.id} className="mb-4 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/30">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-indigo-600" />
@@ -209,21 +215,84 @@ function SettingsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Users & roles (RBAC)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm">Users & roles (RBAC)</CardTitle>
+              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    disabled={!canManageUsers}
+                    title={canManageUsers ? "" : `${persona.role} cannot add users — IT Admin / Reliability Manager only`}
+                  >
+                    <UserPlus className="size-3 mr-1" />Invite user
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Invite user to {tenant.name}</DialogTitle>
+                    <DialogDescription>New users receive an email invite. Role can be changed later.</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5 col-span-2"><Label className="text-xs">Full name</Label><Input value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="h-8" placeholder="e.g. Jamie Larsen" /></div>
+                    <div className="grid gap-1.5 col-span-2"><Label className="text-xs">Email</Label><Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="h-8" placeholder={`name@${tenant.subdomain}.io`} /></div>
+                    <div className="grid gap-1.5 col-span-2">
+                      <Label className="text-xs">Role</Label>
+                      <Select value={inviteRole} onValueChange={setInviteRole}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Reliability Manager">Reliability Manager</SelectItem>
+                          <SelectItem value="Maintenance Engineer">Maintenance Engineer</SelectItem>
+                          <SelectItem value="IT Admin">IT Admin</SelectItem>
+                          <SelectItem value="Viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+                    <Button
+                      disabled={!inviteName || !inviteEmail}
+                      onClick={() => {
+                        addUser({ name: inviteName, email: inviteEmail, role: inviteRole, lastLogin: "Pending invite", permissions: [] });
+                        log("Invited user", `${inviteEmail} · ${inviteRole}`);
+                        toast.success(`Invite sent to ${inviteEmail}`, { description: `${inviteRole} · ${tenant.name}` });
+                        setInviteOpen(false); setInviteName(""); setInviteEmail(""); setInviteRole("Viewer");
+                      }}
+                    >Send invite</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-100 dark:border-slate-800">
-                <tr><th className="text-left px-4 py-2">User</th><th className="text-left px-4 py-2">Role</th><th className="text-right px-4 py-2">Last login</th></tr>
+                <tr><th className="text-left px-4 py-2">User</th><th className="text-left px-4 py-2">Role</th><th className="text-left px-4 py-2">Last login</th><th className="text-right px-4 py-2">Action</th></tr>
               </thead>
               <tbody>
-                {tenant.users.map((u) => (
+                {tenantUsers.map((u) => (
                   <tr key={u.email} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{u.name}</div>
                       <div className="text-[11px] text-slate-500">{u.email}</div>
                     </td>
                     <td className="px-4 py-2.5"><Badge variant="secondary" className="text-[10px]">{u.role}</Badge></td>
-                    <td className="px-4 py-2.5 text-right text-[11px] text-slate-500">{u.lastLogin}</td>
+                    <td className="px-4 py-2.5 text-[11px] text-slate-500">{u.lastLogin}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-[10px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                        disabled={!canManageUsers || u.email === persona.name}
+                        title={canManageUsers ? "Remove user" : `${persona.role} cannot remove users`}
+                        onClick={() => { removeUser(u.email); log("Removed user", u.email); toast.success(`${u.name} removed from ${tenant.name}`); }}
+                      >
+                        <Trash2 className="size-3 mr-1" />Remove
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
