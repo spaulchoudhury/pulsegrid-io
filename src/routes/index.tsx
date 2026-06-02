@@ -356,6 +356,52 @@ function Overview() {
           </table>
         </CardContent>
       </Card>
+
+      <Card className="mt-4">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Active monitoring rules — {tenant.name}</CardTitle>
+            <span className="text-[10px] text-slate-500">{rules.length} custom · evaluated every 60s against live ingest</span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {rules.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-slate-500">
+              No custom rules yet for {tenant.name}. Use <span className="font-medium">New monitoring rule</span> above to create one — it will appear here and start evaluating on next ingest.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <th className="text-left px-4 py-2">Rule</th>
+                  <th className="text-left px-4 py-2">Condition</th>
+                  <th className="text-left px-4 py-2">Scope</th>
+                  <th className="text-left px-4 py-2">Severity</th>
+                  <th className="text-left px-4 py-2">Created</th>
+                  <th className="text-right px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-slate-500">{r.id} · by {r.createdBy}</div></td>
+                    <td className="px-4 py-2 font-mono text-xs">{r.metric} {r.op} {r.threshold}</td>
+                    <td className="px-4 py-2 text-xs">{r.scope === "*" ? "All assets" : r.scope}</td>
+                    <td className="px-4 py-2"><Badge variant="outline" className={`text-[10px] capitalize ${r.severity === "critical" ? "border-red-300 text-red-700" : r.severity === "warning" ? "border-amber-300 text-amber-700" : ""}`}>{r.severity}</Badge></td>
+                    <td className="px-4 py-2 text-[11px] text-slate-500">{r.createdAt}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => toggleRule(r.id)}>
+                        {r.enabled ? <span className="text-emerald-600">● Enabled</span> : <span className="text-slate-400">○ Paused</span>}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-[10px] text-red-600" onClick={() => removeRule(r.id)}>Remove</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </AppLayout>
   );
 }
