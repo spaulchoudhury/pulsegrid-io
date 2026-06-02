@@ -148,7 +148,7 @@ function NewRuleDialog() {
 }
 
 function Overview() {
-  const { tenant, persona, can } = useApp();
+  const { tenant, persona, can, rules, toggleRule, removeRule } = useApp();
   const navigate = useNavigate();
   const [chartAssetId, setChartAssetId] = useState<string>(tenant.assets[0]?.id ?? "");
   const chartAsset = useMemo(
