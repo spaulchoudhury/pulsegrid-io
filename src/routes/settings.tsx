@@ -25,7 +25,12 @@ export const Route = createFileRoute("/settings")({
 const COLOR_PRESETS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#a855f7"];
 
 function SettingsPage() {
-  const { tenant, primaryColor, setPrimaryColor, region, setRegion, can, log, persona } = useApp();
+  const { tenant, primaryColor, setPrimaryColor, region, setRegion, can, log, persona, tenantUsers, addUser, removeUser } = useApp();
+  const canManageUsers = can("manage:users") || persona.role === "Reliability Manager";
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("Viewer");
   const [colorDraft, setColorDraft] = useState(primaryColor);
   const [nameDraft, setNameDraft] = useState(tenant.name);
   const [subDraft, setSubDraft] = useState(tenant.subdomain);
