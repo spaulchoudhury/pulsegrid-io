@@ -137,8 +137,8 @@ function NewRuleDialog() {
           <Button
             onClick={() => {
               setOpen(false);
-              log("Created monitoring rule", `${name} · ${metric} ${op} ${value}`);
-              toast.success("Monitoring rule created", { description: `${name} · ${assetId === "*" ? "all assets" : assetId} · ${severity}` });
+              addRule({ name, scope: assetId, metric, op, threshold: value, severity });
+              toast.success("Monitoring rule created", { description: `Visible in 'Active monitoring rules' on Overview · applies to ${assetId === "*" ? "all assets" : assetId}` });
             }}
           >Create rule</Button>
         </DialogFooter>
