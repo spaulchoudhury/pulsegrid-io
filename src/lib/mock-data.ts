@@ -372,3 +372,53 @@ export function fleetUptimeFor(seed: string) {
 
 // expose unused helper to keep tree-shaker happy
 export { scoreFor };
+
+// Tenant-specific failing endpoints for API error triage dialog
+export function failingEndpointsFor(t: TenantData) {
+  const ingest = t.assets[0]?.id ?? "ASSET-001";
+  if (t.id === "acme") {
+    return [
+      { p: "POST /v1/ingest/vibration", code: 502, count: 14, lastSeen: "22s ago", cause: `Upstream gateway timeout (Plant A · ${ingest})` },
+      { p: "POST /v1/rules", code: 422, count: 4, lastSeen: "2m ago", cause: "Schema validation — unknown metric 'kurt_x'" },
+      { p: "GET /v1/assets/{id}/health", code: 500, count: 1, lastSeen: "8m ago", cause: "Transient query timeout on time-series store" },
+    ];
+  }
+  if (t.id === "nordwind") {
+    return [
+      { p: "POST /v1/ingest/vibration", code: 502, count: 18, lastSeen: "12s ago", cause: `SCADA bridge → API gateway timeout (Skagen Row 2 · ${ingest})` },
+      { p: "POST /v1/ingest/vibration", code: 429, count: 7, lastSeen: "1m ago", cause: "Rate limit burst — Esbjerg park backfill" },
+      { p: "GET /v1/alerts", code: 500, count: 2, lastSeen: "3m ago", cause: "Transient query timeout" },
+    ];
+  }
+  // transrail (degraded)
+  return [
+    { p: "POST /v1/ingest/vibration", code: 504, count: 42, lastSeen: "9s ago", cause: `Edge gateway WAN flap — Munich Depot (${ingest})` },
+    { p: "POST /v1/ingest/vibration", code: 429, count: 23, lastSeen: "38s ago", cause: "Pilot tier rate cap reached (100k / day)" },
+    { p: "GET /v1/assets/{id}/health", code: 503, count: 6, lastSeen: "2m ago", cause: "Backpressure from time-series writer" },
+    { p: "POST /v1/webhooks", code: 401, count: 3, lastSeen: "5m ago", cause: "Signature mismatch — rotated key not redeployed" },
+  ];
+}
+
+// Seed historical audit events per tenant (multi-day history, not just 1d)
+export function seedAuditFor(t: TenantData) {
+  const u = t.users;
+  const pick = (i: number) => u[i % u.length]?.name ?? u[0].name;
+  return [
+    { ts: "2m ago",      action: "Acknowledged alert",    target: t.alerts[0]?.id ?? "—", actor: pick(1) },
+    { ts: "18m ago",     action: "Created work order",    target: `WO-4799 ← ${t.alerts[1]?.id ?? "—"}`, actor: pick(0) },
+    { ts: "1h ago",      action: "Rotated API key",       target: "Production", actor: pick(2) },
+    { ts: "3h ago",      action: "Updated threshold",     target: "Vibration RMS critical 5.0 → 4.8", actor: pick(0) },
+    { ts: "6h ago",      action: "Snoozed alert",         target: `${t.alerts[2]?.id ?? "—"} · 24h`, actor: pick(1) },
+    { ts: "Yesterday",   action: "Invited user",          target: `${u[u.length - 1]?.email ?? "—"} · ${u[u.length - 1]?.role ?? "Viewer"}`, actor: pick(2) },
+    { ts: "Yesterday",   action: "Toggled security setting", target: "Require MFA for all users=true", actor: pick(2) },
+    { ts: "2d ago",      action: "Exported tenant data",  target: `tenant_${t.id} · GDPR Art. 20`, actor: pick(2) },
+    { ts: "3d ago",      action: "Connected integration", target: t.integrations[0]?.name ?? "Slack", actor: pick(0) },
+    { ts: "4d ago",      action: "Created monitoring rule", target: "Temp > 65°C · all assets", actor: pick(0) },
+    { ts: "6d ago",      action: "Reassigned alert",      target: `${t.alerts[0]?.id ?? "—"} → ${pick(1)}`, actor: pick(0) },
+    { ts: "8d ago",      action: "Closed work order",     target: "WO-4781 (bearing replaced)", actor: pick(1) },
+    { ts: "12d ago",     action: "Changed data region",   target: t.region, actor: pick(2) },
+    { ts: "21d ago",     action: "Updated branding",      target: `name=${t.name}`, actor: pick(2) },
+    { ts: "30d ago",     action: "Tenant provisioned",    target: `tenant_${t.id} · ${t.plan}`, actor: "PulseGrid Trust Service" },
+  ];
+}
+
