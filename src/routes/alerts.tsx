@@ -214,15 +214,21 @@ function AlertAnalytics() {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><History className="size-4" /> Audit log</CardTitle></CardHeader>
-        <CardContent className="p-0 max-h-56 overflow-auto">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm flex items-center gap-2"><History className="size-4" /> Audit log — full history</CardTitle>
+            <span className="text-[10px] text-slate-500">{audit.length} events · GDPR retained 7y</span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 max-h-80 overflow-auto">
           <ul className="text-[11px] divide-y divide-slate-100 dark:divide-slate-800">
-            {audit.slice(0, 8).map((e) => (
+            {audit.map((e) => (
               <li key={e.id} className="px-4 py-2">
                 <div className="font-medium">{e.action}</div>
                 <div className="text-slate-500">{e.actor} · {e.target} · {e.ts}</div>
               </li>
             ))}
+            {audit.length === 0 && <li className="px-4 py-6 text-center text-slate-400">No audit events for {tenant.name}</li>}
           </ul>
         </CardContent>
       </Card>
