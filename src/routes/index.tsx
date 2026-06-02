@@ -57,7 +57,7 @@ function Kpi({ label, value, delta, icon: Icon, tone = "default" }: {
 }
 
 function NewRuleDialog() {
-  const { tenant, can, log } = useApp();
+  const { tenant, can, addRule } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("Bearing RMS critical");
   const [assetId, setAssetId] = useState<string>(tenant.assets[0]?.id ?? "");
