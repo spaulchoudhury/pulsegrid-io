@@ -1,5 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getTenant, personas as basePersonas, tenants, type PersonaProfile, type TenantData } from "./mock-data";
+import { getTenant, personas as basePersonas, seedAuditFor, tenants, type PersonaProfile, type TenantData, type TenantUser } from "./mock-data";
+
+export interface MonitoringRule {
+  id: string;
+  tenantId: string;
+  name: string;
+  scope: string; // asset id or "*"
+  metric: string;
+  op: string;
+  threshold: string;
+  severity: string;
+  createdBy: string;
+  createdAt: string;
+  enabled: boolean;
+}
 
 export interface Notification {
   id: string;
