@@ -13,7 +13,9 @@ import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/api")({
   head: () => ({ meta: [{ title: "API & Integrations · PulseGrid" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ focus: (s.focus as string) || "" }),
+  validateSearch: (s: Record<string, unknown>): { focus?: string } => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: ApiPage,
 });
 
